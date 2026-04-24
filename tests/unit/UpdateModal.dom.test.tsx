@@ -14,7 +14,12 @@ vi.mock('@/common', () => ({
   ipcBridge: {
     update: {
       open: { on: vi.fn(() => vi.fn()) },
-      check: { invoke: vi.fn().mockResolvedValue({ success: true, data: { currentVersion: '1.0.0', updateAvailable: false, latest: null } }) },
+      check: {
+        invoke: vi.fn().mockResolvedValue({
+          success: true,
+          data: { currentVersion: '1.0.0', updateAvailable: false, latest: null },
+        }),
+      },
       download: { invoke: vi.fn() },
       downloadProgress: { on: vi.fn(() => vi.fn()) },
     },
@@ -33,11 +38,11 @@ vi.mock('@/common', () => ({
 }));
 
 vi.mock('@/renderer/components/base/AionModal', () => ({
-  default: ({ children, visible }: any) => visible ? <div data-testid="aion-modal">{children}</div> : null,
+  default: ({ children, visible }: any) => (visible ? <div data-testid='aion-modal'>{children}</div> : null),
 }));
 
 vi.mock('@/renderer/components/Markdown', () => ({
-  default: () => <div data-testid="markdown" />,
+  default: () => <div data-testid='markdown' />,
 }));
 
 describe('UpdateModal', () => {
@@ -55,7 +60,7 @@ describe('UpdateModal', () => {
   it('renders GIT_COMMIT_HASH when upToDate', async () => {
     process.env.GIT_COMMIT_HASH = '1234567';
     render(<UpdateModal />);
-    
+
     await act(async () => {
       window.dispatchEvent(new CustomEvent('aionui-open-update-modal'));
     });
@@ -66,7 +71,7 @@ describe('UpdateModal', () => {
   it('does not render GIT_COMMIT_HASH when unknown in upToDate', async () => {
     process.env.GIT_COMMIT_HASH = 'unknown';
     render(<UpdateModal />);
-    
+
     await act(async () => {
       window.dispatchEvent(new CustomEvent('aionui-open-update-modal'));
     });
@@ -74,17 +79,17 @@ describe('UpdateModal', () => {
     expect(await screen.findByText('update.upToDateTitle')).toBeTruthy();
     expect(screen.queryByText('(unknown)')).toBeNull();
   });
-  
+
   it('renders GIT_COMMIT_HASH when available', async () => {
     process.env.GIT_COMMIT_HASH = '1234567';
     const { ipcBridge } = await import('@/common');
     (ipcBridge.update.check.invoke as any).mockResolvedValueOnce({
       success: true,
-      data: { currentVersion: '1.0.0', updateAvailable: true, latest: { version: '1.0.1' } }
+      data: { currentVersion: '1.0.0', updateAvailable: true, latest: { version: '1.0.1' } },
     });
-    
+
     render(<UpdateModal />);
-    
+
     await act(async () => {
       window.dispatchEvent(new CustomEvent('aionui-open-update-modal'));
     });
@@ -97,11 +102,11 @@ describe('UpdateModal', () => {
     const { ipcBridge } = await import('@/common');
     (ipcBridge.update.check.invoke as any).mockResolvedValueOnce({
       success: true,
-      data: { currentVersion: '1.0.0', updateAvailable: true, latest: { version: '1.0.1' } }
+      data: { currentVersion: '1.0.0', updateAvailable: true, latest: { version: '1.0.1' } },
     });
-    
+
     render(<UpdateModal />);
-    
+
     await act(async () => {
       window.dispatchEvent(new CustomEvent('aionui-open-update-modal'));
     });

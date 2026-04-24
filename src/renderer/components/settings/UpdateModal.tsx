@@ -326,9 +326,7 @@ const UpdateModal: React.FC = () => {
                   <div className='flex items-center gap-4px text-12px text-t-tertiary mt-2px'>
                     <span>{currentVersion}</span>
                     {process.env.GIT_COMMIT_HASH && process.env.GIT_COMMIT_HASH !== 'unknown' && (
-                      <span className='opacity-70 font-mono scale-90 origin-left'>
-                        ({process.env.GIT_COMMIT_HASH})
-                      </span>
+                      <span className='opacity-70 font-mono scale-90 origin-left'>({process.env.GIT_COMMIT_HASH})</span>
                     )}
                     <span className='mx-2px'>→</span>
                     <span className='text-[rgb(var(--primary-6))] font-500'>

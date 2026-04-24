@@ -20,7 +20,7 @@ vi.mock('../../src/renderer/components/settings/settingsViewContext', () => ({
 }));
 
 vi.mock('../../src/renderer/components/settings/SettingsModal/contents/FeedbackReportModal', () => ({
-  default: () => <div data-testid="feedback-modal" />
+  default: () => <div data-testid='feedback-modal' />,
 }));
 
 describe('AboutModalContent', () => {
