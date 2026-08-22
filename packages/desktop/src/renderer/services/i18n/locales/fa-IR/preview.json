@@ -177,5 +177,16 @@
   "zoomIn": "بزرگ‌نمایی",
   "zoomOut": "کوچک‌نمایی",
   "zoomReset": "بازنشانی نما",
-  "diagramZoomHint": "برای بزرگنمایی اسکرول کنید • برای جابهجایی بکشید • ESC برای بستن"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "اسکرول برای بزرگنمایی • کشیدن برای جابه‌جایی • ←/→ برای مرور نمودارها • ESC برای بستن",
+  "diagramGalleryNext": "نمودار بعدی",
+  "diagramGalleryPrev": "نمودار قبلی",
+  "diagramCopySource": "کپی کد منبع",
+  "diagramCopyImage": "کپی تصویر",
+  "diagramSaveImage": "ذخیره تصویر",
+  "diagramImageExportFailed": "خطا در خروجی تصویر نمودار",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "برای بزرگنمایی دو انگشت را باز کنید • برای جابه‌جایی بکشید • برای تعویض سوایپ کنید",
+  "diagramGalleryHelp": "راهنما"
 }

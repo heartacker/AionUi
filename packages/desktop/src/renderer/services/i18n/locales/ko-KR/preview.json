@@ -177,5 +177,16 @@
   "zoomIn": "확대",
   "zoomOut": "축소",
   "zoomReset": "보기 재설정",
-  "diagramZoomHint": "스크롤로 확대 • 드래그로 이동 • ESC로 닫기"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "스크롤로 확대 • 드래그로 이동 • ←/→ 다이어그램 탐색 • ESC로 닫기",
+  "diagramGalleryNext": "다음 다이어그램",
+  "diagramGalleryPrev": "이전 다이어그램",
+  "diagramCopySource": "소스 복사",
+  "diagramCopyImage": "이미지 복사",
+  "diagramSaveImage": "이미지 저장",
+  "diagramImageExportFailed": "이미지 내보내기 실패",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "핀치로 확대 • 드래그로 이동 • 스와이프로 전환",
+  "diagramGalleryHelp": "도움말"
 }

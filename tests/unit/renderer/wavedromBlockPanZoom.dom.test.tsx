@@ -66,9 +66,14 @@ vi.mock('@icon-park/react', () => ({
   ZoomOut: makeIcon('zoom-out'),
   Refresh: makeIcon('refresh'),
   Close: makeIcon('close'),
+  Picture: makeIcon('picture'),
+  Download: makeIcon('download'),
+  Help: makeIcon('help'),
+  ArrowLeft: makeIcon('arrow-left'),
+  ArrowRight: makeIcon('arrow-right'),
 }));
 
-import WavedromBlock from '@/renderer/components/Markdown/WavedromBlock';
+import WavedromBlock from '@/renderer/components/Markdown/diagrams/WavedromBlock';
 
 // jsdom lacks the pointer capture API used by the drag handlers.
 beforeAll(() => {
@@ -139,7 +144,7 @@ describe('WavedromBlock pan/zoom', () => {
     expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
   });
 
-  it('opens the zoom overlay on click without panning when drag-to-pan is enabled', () => {
+  it('opens the zoom overlay on click without panning when drag-to-pan is enabled', async () => {
     render(<WavedromBlock code={VALID_WAVEJSON} enablePanZoom />);
     const diagram = screen.getByTestId('wavedrom-diagram');
 
@@ -149,7 +154,9 @@ describe('WavedromBlock pan/zoom', () => {
 
     const inner = diagram.firstElementChild as HTMLElement;
     expect(inner.style.transform).toContain('translate(0px, 0px) scale(1)');
-    expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
+    // The overlay opens one tick after pointerup so the tap's trailing click
+    // lands on the block instead of the overlay backdrop.
+    await vi.waitFor(() => expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument());
   });
 
   it('pans instead of opening the overlay when the pointer drags past the threshold', () => {

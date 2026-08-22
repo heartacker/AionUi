@@ -177,5 +177,16 @@
   "zoomIn": "Yakınlaştır",
   "zoomOut": "Uzaklaştır",
   "zoomReset": "Görünümü sıfırla",
-  "diagramZoomHint": "Yakınlaştırmak için kaydırın • Taşımak için sürükleyin • ESC ile kapatın"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "Yakınlaştırmak için kaydırın • Taşımak için sürükleyin • ←/→ diyagramlar arasında gezinin • ESC ile kapatın",
+  "diagramGalleryNext": "Sonraki diyagram",
+  "diagramGalleryPrev": "Önceki diyagram",
+  "diagramCopySource": "Kaynağı kopyala",
+  "diagramCopyImage": "Görseli kopyala",
+  "diagramSaveImage": "Görseli kaydet",
+  "diagramImageExportFailed": "Diyagram görseli dışa aktarılamadı",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "Sıkıştırarak yakınlaştırın • Sürükleyerek taşıyın • Kaydırarak geçiş yapın",
+  "diagramGalleryHelp": "Yardım"
 }

@@ -1,0 +1,900 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import {
+  ArrowLeft,
+  ArrowRight,
+  Close,
+  Copy,
+  Download,
+  Help,
+  Picture,
+  Refresh,
+  ZoomIn,
+  ZoomOut,
+} from '@icon-park/react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+import { Message } from '@arco-design/web-react';
+import { copyText } from '@/renderer/utils/ui/clipboard';
+import { getSvgIntrinsicSize, type DiagramSize } from '../markdownUtils';
+import { copySvgImage, saveDiagramImage, type DiagramExportFormat } from './diagramExport';
+import type { DiagramItem } from './DiagramGalleryContext';
+
+/**
+ * Single-diagram mode keeps the original zoom overlay API (svg + onClose);
+ * gallery mode receives the whole registered stream plus the active id and
+ * adds prev/next navigation, a position counter and Home/End jump keys.
+ */
+type DiagramZoomOverlayProps = {
+  svg?: string;
+  onClose: () => void;
+  /** Accessible name for the dialog (e.g. the diagram type title). */
+  ariaLabel?: string;
+  /**
+   * Explicit card backdrop color. Diagram types whose strokes depend on the
+   * backdrop (WaveDrom: the dark skin paints pure-white lines) pass a
+   * deterministic color here so lines stay visible even when the --bg-1 token
+   * resolves to the wrong value; other types keep the token default.
+   */
+  panelBackground?: string;
+  /** Gallery mode: all registered diagrams in stream order. */
+  items?: DiagramItem[];
+  /** Gallery mode: id of the diagram currently highlighted. */
+  activeId?: string;
+  /** Gallery mode: switch the highlight to another diagram's id. */
+  onNavigate?: (id: string) => void;
+  /** Single mode: raw source code for the copy-source toolbar action. */
+  code?: string;
+};
+
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 10;
+const BUTTON_ZOOM_FACTOR = 1.2;
+const WHEEL_ZOOM_FACTOR = 1.1;
+// Viewport padding used when auto-fitting the diagram on open.
+const FIT_PADDING = 80;
+// Overlay viewport caps (percentage of the window) for deeply zoomed diagrams.
+const MAX_BOX_WIDTH = '90vw';
+const MAX_BOX_HEIGHT = '85vh';
+// Touch swipe: horizontal displacement past this threshold with at least 2:1
+// horizontal dominance flips to the next/previous diagram (touch pointers only,
+// at fit scale — a zoomed-in diagram pans instead, like every photo gallery).
+const SWIPE_THRESHOLD = 60;
+// Small pointer movement below this counts as a tap, not a drag.
+const DRAG_THRESHOLD = 4;
+
+/** Evaluate a media query defensively: jsdom and very old browsers lack matchMedia. */
+const matchMediaQuery = (query: string): boolean => {
+  if (typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia(query).matches;
+};
+
+const toolbarButtonStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '6px',
+  border: 'none',
+  borderRadius: '6px',
+  background: 'transparent',
+  cursor: 'pointer',
+};
+
+// Diagram blocks inject `max-width: min(100%, <natural width>)` into the SVG root
+// so inline diagrams never stretch past their natural size. Drop that cap here:
+// the overlay panel already sizes the wrapper from the natural dimensions and
+// the SVG must fill it. Roots with a viewBox (Mermaid, WaveDrom) are also forced
+// to fill the panel: WaveDrom carries fixed pixel width/height attributes, so
+// without the width/height rules it would render at its natural size inside the
+// scaled card — smaller than the card and top-left instead of centered.
+const stripInlineMaxWidth = (svg: string): string =>
+  svg.replace(/<svg\b[^>]*>/i, (tag) => {
+    const cleaned = tag.replace(/max-width\s*:\s*[^;"']+;?/gi, '');
+    if (!/\bviewBox\s*=/.test(cleaned)) return cleaned;
+    const fillRules = 'width: 100%; height: 100%;';
+    const styleMatch = /(\sstyle\s*=\s*)(["'])([\s\S]*?)\2/i.exec(cleaned);
+    if (styleMatch) {
+      return cleaned.replace(
+        styleMatch[0],
+        `${styleMatch[1]}${styleMatch[2]}${styleMatch[3]}${fillRules}${styleMatch[2]}`
+      );
+    }
+    return cleaned.replace(/\/?\s*>$/, (tail) => ` style="${fillRules}"${tail}`);
+  });
+
+/**
+ * Fullscreen diagram viewer opened by clicking a rendered diagram (shared by the
+ * Mermaid and WaveDrom blocks).
+ *
+ * Interaction follows the classic lightbox pattern: wheel zooms around the fit
+ * scale (0.1x-10x), dragging pans, ESC / backdrop click / the close button close
+ * it. Visuals stick to AionUi tokens: Arco mask, --bg-* panels and icon-park icons
+ * in the same order as the inline block header (zoom out / zoom in / reset), plus
+ * a close action.
+ *
+ * Sizing: the card hugs the diagram's natural aspect ratio and grows with the
+ * zoom level. The overlay root is the only clip window, so content is cut off
+ * only at the screen edges — never by a smaller panel while free space is still
+ * available. Pan moves the card across the screen; deep zooms clip at the
+ * viewport and stay draggable. The open scale is a contain-fit against the
+ * viewport (padding 80px), so whichever side of the diagram is larger
+ * constrains the fit — a tall diagram fits by height instead of stretching
+ * across the screen.
+ */
+function DiagramZoomOverlay({
+  svg,
+  onClose,
+  ariaLabel,
+  panelBackground,
+  items,
+  activeId,
+  onNavigate,
+  code,
+}: DiagramZoomOverlayProps) {
+  const { t } = useTranslation();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const [base, setBase] = useState<DiagramSize | null>(null);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  // Multi-pointer gesture state: one pointer pans / may swipe-navigate (touch),
+  // two pointers pinch-zoom around the moving midpoint.
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const swipeRef = useRef<{
+    pointerId: number;
+    pointerType: string;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  const pinchRef = useRef<{
+    startDistance: number;
+    startScale: number;
+    startX: number;
+    startY: number;
+    startMidX: number;
+    startMidY: number;
+  } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const initialScaleRef = useRef(1);
+
+  // Adaptive layout: small screens get a wider footer and bigger touch targets;
+  // coarse pointers get a touch-oriented interaction hint.
+  const [isSmallScreen, setIsSmallScreen] = useState(() => matchMediaQuery('(max-width: 640px)'));
+  const [isTouchDevice, setIsTouchDevice] = useState(() => matchMediaQuery('(pointer: coarse)'));
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const smallQuery = window.matchMedia('(max-width: 640px)');
+    const coarseQuery = window.matchMedia('(pointer: coarse)');
+    const update = () => {
+      setIsSmallScreen(smallQuery.matches);
+      setIsTouchDevice(coarseQuery.matches);
+    };
+    smallQuery.addEventListener?.('change', update);
+    coarseQuery.addEventListener?.('change', update);
+    return () => {
+      smallQuery.removeEventListener?.('change', update);
+      coarseQuery.removeEventListener?.('change', update);
+    };
+  }, []);
+
+  // Gallery mode highlights one item of the registered stream; single mode is
+  // the previous behavior with the svg handed in directly.
+  const isGallery = items != null && activeId != null;
+  const activeIndex = isGallery ? items.findIndex((item) => item.id === activeId) : -1;
+  const activeItem = isGallery && activeIndex >= 0 ? items[activeIndex] : null;
+  const overlaySvg = useMemo(() => stripInlineMaxWidth(activeItem ? activeItem.svg : (svg ?? '')), [activeItem, svg]);
+
+  // Switching diagrams re-runs the sizing pipeline from scratch: forget the
+  // previous diagram's size, scale and pan so the next one is measured and
+  // contain-fitted again instead of inheriting the old view.
+  const activeKey = activeItem?.id ?? 'single';
+  useLayoutEffect(() => {
+    setBase(null);
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+  }, [activeKey]);
+
+  // Resolve the natural diagram size (viewBox first, then a DOM measurement for
+  // SVGs without one).
+  useLayoutEffect(() => {
+    if (base) return;
+    const intrinsic = getSvgIntrinsicSize(overlaySvg);
+    if (intrinsic) {
+      setBase(intrinsic);
+      return;
+    }
+    const svgElement = overlayRef.current?.querySelector('svg');
+    const width = svgElement?.scrollWidth || svgElement?.clientWidth;
+    const height = svgElement?.scrollHeight || svgElement?.clientHeight;
+    if (width && height) setBase({ width, height });
+  }, [overlaySvg, base]);
+
+  // Contain-fit the diagram into the viewport: the larger side constrains the
+  // scale so neither dimension overflows. Gallery mode reserves extra room at
+  // the bottom for the control bar + thumbnail strip, so a tall diagram never
+  // hides behind the footer.
+  const hasThumbs = isGallery && (items?.length ?? 0) > 1;
+  useLayoutEffect(() => {
+    if (!base) return;
+    const bottomChrome = hasThumbs ? 170 : FIT_PADDING;
+    const fitScale = Math.min(
+      (window.innerWidth - FIT_PADDING * 2) / base.width,
+      (window.innerHeight - FIT_PADDING - bottomChrome) / base.height
+    );
+    const clamped = Math.min(Math.max(fitScale, MIN_SCALE), MAX_SCALE);
+    initialScaleRef.current = clamped;
+    setScale(clamped);
+  }, [base, hasThumbs]);
+
+  // Wheel zoom needs a native listener: React's root wheel listeners are
+  // passive, so preventDefault via the synthetic event cannot stop page scroll.
+  useEffect(() => {
+    const element = overlayRef.current;
+    if (!element) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setScale((prev) => {
+        const factor = event.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
+        return Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev * factor));
+      });
+    };
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Keyboard: ESC closes; gallery mode also flips diagrams with ←/→ (or A/D)
+  // and jumps to the first/last with Home/End.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (!isGallery || !items || !onNavigate || items.length === 0) return;
+      const last = items.length - 1;
+      if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
+        if (activeIndex > 0) onNavigate(items[activeIndex - 1].id);
+      } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
+        if (activeIndex < last) onNavigate(items[activeIndex + 1].id);
+      } else if (event.key === 'Home') {
+        onNavigate(items[0].id);
+      } else if (event.key === 'End') {
+        onNavigate(items[last].id);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isGallery, items, activeIndex, onNavigate, onClose]);
+
+  const zoomBy = (factor: number) => setScale((prev) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev * factor)));
+  const resetView = () => {
+    setScale(initialScaleRef.current);
+    setTranslate({ x: 0, y: 0 });
+  };
+
+  const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanning(true);
+
+    if (pointersRef.current.size === 1) {
+      // Single pointer: pan; a touch pointer is also a swipe-to-navigate candidate.
+      swipeRef.current = {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: translate.x,
+        originY: translate.y,
+        moved: false,
+      };
+    } else if (pointersRef.current.size === 2) {
+      // Second finger lands: switch from swipe to pinch, anchored on the current view.
+      swipeRef.current = null;
+      const [first, second] = [...pointersRef.current.values()];
+      pinchRef.current = {
+        startDistance: Math.hypot(first.x - second.x, first.y - second.y) || 1,
+        startScale: scale,
+        startX: translate.x,
+        startY: translate.y,
+        startMidX: (first.x + second.x) / 2,
+        startMidY: (first.y + second.y) / 2,
+      };
+    }
+  };
+
+  const handlePanPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    const pinch = pinchRef.current;
+    if (pinch && pointersRef.current.size === 2) {
+      const [first, second] = [...pointersRef.current.values()];
+      const distance = Math.hypot(first.x - second.x, first.y - second.y);
+      const midX = (first.x + second.x) / 2;
+      const midY = (first.y + second.y) / 2;
+      const ratio = distance / pinch.startDistance;
+      setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, pinch.startScale * ratio)));
+      setTranslate({ x: pinch.startX + (midX - pinch.startMidX), y: pinch.startY + (midY - pinch.startMidY) });
+      return;
+    }
+
+    const swipe = swipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - swipe.startX;
+    const deltaY = event.clientY - swipe.startY;
+    if (!swipe.moved && Math.abs(deltaX) + Math.abs(deltaY) < DRAG_THRESHOLD) return;
+    swipe.moved = true;
+    setTranslate({ x: swipe.originX + deltaX, y: swipe.originY + deltaY });
+  };
+
+  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.delete(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    // One finger lifted off a pinch: keep panning with the remaining finger.
+    if (pinchRef.current && pointersRef.current.size < 2) {
+      pinchRef.current = null;
+      const remaining = [...pointersRef.current.entries()][0];
+      if (remaining) {
+        const [pointerId, position] = remaining;
+        swipeRef.current = {
+          pointerId,
+          pointerType: 'touch',
+          startX: position.x,
+          startY: position.y,
+          originX: translate.x,
+          originY: translate.y,
+          moved: false,
+        };
+      }
+    }
+
+    // Swipe navigation: a horizontal touch flick at fit scale flips diagrams.
+    // Mouse drags and zoomed-in gestures keep panning — see SWIPE_THRESHOLD.
+    const swipe = swipeRef.current;
+    if (swipe && swipe.pointerId === event.pointerId) {
+      swipeRef.current = null;
+      const deltaX = event.clientX - swipe.startX;
+      const deltaY = event.clientY - swipe.startY;
+      const atFitScale = scale <= initialScaleRef.current + 0.05;
+      const isHorizontalFlick = Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * 2;
+      if (swipe.pointerType === 'touch' && atFitScale && isHorizontalFlick) {
+        navigateBy(deltaX < 0 ? 1 : -1);
+      }
+    }
+
+    if (pointersRef.current.size === 0) setIsPanning(false);
+  };
+
+  // With a known natural size the card is an explicit box hugging the diagram at
+  // its rendered size — uncapped, so it only stops growing past the screen edges
+  // where the overlay root clips it. Without one, fall back to the natural SVG
+  // layout with a transform scale.
+  const contentStyle: React.CSSProperties = base
+    ? { width: base.width * scale, height: base.height * scale }
+    : { maxWidth: MAX_BOX_WIDTH, maxHeight: MAX_BOX_HEIGHT };
+  // Pan transforms the card itself: the overlay root is the fixed clip window,
+  // so every part of an oversized diagram stays reachable by dragging.
+  const diagramTransform = base
+    ? `translate(${translate.x}px, ${translate.y}px)`
+    : `translate(${translate.x}px, ${translate.y}px) scale(${scale})`;
+
+  // Human-readable type label for the header; keys already exist per diagram type.
+  const typeLabel = activeItem
+    ? activeItem.type === 'wavedrom'
+      ? t('preview.wavedromTitle')
+      : activeItem.type === 'chart'
+        ? t('preview.echartsTitle')
+        : t('preview.mermaidTitle')
+    : (ariaLabel ?? '');
+  const subtitle = activeItem?.title;
+  const dialogAriaLabel =
+    activeItem && (subtitle || typeLabel)
+      ? `${typeLabel}${subtitle ? `: ${subtitle}` : ''}${isGallery && items.length > 1 ? ` ${t('preview.diagramGalleryCounter', { current: activeIndex + 1, total: items.length })}` : ''}`
+      : typeLabel;
+  const cardBackground = activeItem?.panelBackground ?? panelBackground;
+  // The content card is keyed by the active diagram so React also swaps the DOM
+  // node cleanly; the viewport reset lives in the effect above (overlay state
+  // is not per-card).
+  const contentKey = activeKey;
+
+  const navigateBy = (direction: -1 | 1) => {
+    if (!isGallery || !items || !onNavigate) return;
+    const target = activeIndex + direction;
+    if (target >= 0 && target < items.length) onNavigate(items[target].id);
+  };
+
+  const itemCount = isGallery && items ? items.length : 0;
+  const canPrev = itemCount > 1 && activeIndex > 0;
+  const canNext = itemCount > 1 && activeIndex < itemCount - 1;
+  const thumbnailsRef = useRef<HTMLDivElement>(null);
+
+  // Keep the active thumbnail visible in the strip when navigating (the strip
+  // scrolls horizontally; keyboard flips could otherwise leave it off-screen).
+  useEffect(() => {
+    const activeThumb = thumbnailsRef.current?.querySelector('[data-active="true"]');
+    if (activeThumb && typeof activeThumb.scrollIntoView === 'function') {
+      activeThumb.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    }
+  }, [activeIndex]);
+
+  // Prev/next live inside the compact nav pill, so they stay borderless and
+  // sized as touch-friendly targets (bigger on small screens).
+  const navClusterButtonStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: isSmallScreen ? '36px' : '32px',
+    height: isSmallScreen ? '36px' : '32px',
+    padding: 0,
+    border: 'none',
+    borderRadius: '6px',
+    background: 'transparent',
+    cursor: 'pointer',
+    transition: 'opacity 0.15s ease-out',
+  };
+
+  // Export actions for the toolbar. The source comes from the gallery item
+  // (or the single-mode code prop) and the image from the active diagram SVG.
+  const sourceCode = activeItem?.code ?? code;
+  const exportSvg = activeItem?.svg ?? svg ?? '';
+  const exportIndex = activeIndex >= 0 ? activeIndex + 1 : 1;
+
+  const handleCopySource = () => {
+    if (!sourceCode) return;
+    void copyText(sourceCode)
+      .then(() => {
+        Message.success(t('common.copySuccess'));
+      })
+      .catch(() => {
+        Message.error(t('common.copyFailed'));
+      });
+  };
+
+  const handleCopyImage = () => {
+    void copySvgImage(exportSvg)
+      .then(() => {
+        Message.success(t('common.copySuccess'));
+      })
+      .catch(() => {
+        Message.error(t('preview.diagramImageExportFailed'));
+      });
+  };
+
+  const handleSaveImage = (format: DiagramExportFormat) => {
+    const extension = format === 'svg' ? 'svg' : 'png';
+    void saveDiagramImage(exportSvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format).catch(() => {
+      Message.error(t('preview.diagramImageExportFailed'));
+    });
+  };
+
+  // The save button pops a small format menu (SVG preferred, PNG as fallback);
+  // the help button pops the interaction hints (hover on desktop, tap on touch).
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  const saveMenuRef = useRef<HTMLDivElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!saveMenuOpen && !helpOpen) return;
+    const closeMenus = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!saveMenuRef.current?.contains(target)) setSaveMenuOpen(false);
+      if (!helpRef.current?.contains(target)) setHelpOpen(false);
+    };
+    document.addEventListener('mousedown', closeMenus);
+    return () => document.removeEventListener('mousedown', closeMenus);
+  }, [saveMenuOpen, helpOpen]);
+
+  const saveMenuItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '6px 10px',
+    border: 'none',
+    borderRadius: '4px',
+    background: 'transparent',
+    cursor: 'pointer',
+    color: 'var(--text-primary)',
+    fontSize: '13px',
+    lineHeight: '20px',
+    whiteSpace: 'nowrap',
+    textAlign: 'left',
+  };
+
+  return createPortal(
+    <div
+      ref={overlayRef}
+      data-testid='diagram-zoom-overlay'
+      role='dialog'
+      aria-modal='true'
+      aria-label={dialogAriaLabel}
+      onClick={(event: React.MouseEvent) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        background: 'var(--color-bg-mask, rgba(29, 33, 41, 0.6))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Top bar: the diagram title and the toolbar share one row — title on
+          the left (shrinking with ellipsis), actions on the right (fixed).
+          Clear of the titlebar / Window Controls Overlay (PWA): env() reports
+          the WCO strip height when active and falls back to the app titlebar
+          height otherwise, so the bar never hides under the controls. */}
+      <div
+        data-testid='diagram-overlay-topbar'
+        style={{
+          position: 'fixed',
+          top: 'calc(env(titlebar-area-height, 38px) + 12px)',
+          left: '16px',
+          right: '16px',
+          zIndex: 10001,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '12px',
+        }}
+      >
+        <div
+          data-testid='diagram-gallery-header'
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            minWidth: 0,
+            flexShrink: 1,
+            maxWidth: isSmallScreen ? '42vw' : '50vw',
+            padding: '6px 12px',
+            background: 'var(--bg-2)',
+            border: '1px solid var(--bg-3)',
+            borderRadius: '8px',
+            color: 'var(--text-secondary)',
+            fontSize: '13px',
+            lineHeight: '20px',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          <span>{typeLabel}</span>
+          {subtitle && (
+            <span style={{ color: 'var(--text-primary)' }} data-testid='diagram-gallery-title'>
+              {subtitle}
+            </span>
+          )}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px',
+            background: 'var(--bg-2)',
+            border: '1px solid var(--bg-3)',
+            borderRadius: '8px',
+            flexShrink: 0,
+          }}
+        >
+          <div
+            ref={helpRef}
+            style={{ position: 'relative', display: 'flex' }}
+            onMouseEnter={() => setHelpOpen(true)}
+            onMouseLeave={() => setHelpOpen(false)}
+          >
+            <button
+              type='button'
+              data-testid='diagram-overlay-help'
+              title={t('preview.diagramGalleryHelp')}
+              aria-label={t('preview.diagramGalleryHelp')}
+              style={toolbarButtonStyle}
+              onClick={() => setHelpOpen((open) => !open)}
+            >
+              <Help theme='outline' size='16' fill='var(--text-secondary)' />
+            </button>
+            {helpOpen && (
+              <div
+                data-testid='diagram-overlay-help-panel'
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  right: 0,
+                  zIndex: 10002,
+                  // The anchor wrapper is only as wide as the help button, so
+                  // shrink-to-fit would collapse the panel; size it from its
+                  // content instead and let maxWidth cap long hints.
+                  width: 'max-content',
+                  maxWidth: 'min(80vw, 320px)',
+                  padding: '8px 12px',
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--bg-3)',
+                  borderRadius: '6px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '13px',
+                  lineHeight: '20px',
+                  whiteSpace: 'normal',
+                  textAlign: 'left',
+                  cursor: 'default',
+                }}
+              >
+                {t(isTouchDevice ? 'preview.diagramGalleryHintTouch' : 'preview.diagramGalleryHint')}
+              </div>
+            )}
+          </div>
+          <button
+            type='button'
+            data-testid='diagram-overlay-zoom-out'
+            title={t('preview.zoomOut')}
+            style={toolbarButtonStyle}
+            onClick={() => zoomBy(1 / BUTTON_ZOOM_FACTOR)}
+          >
+            <ZoomOut theme='outline' size='16' fill='var(--text-secondary)' />
+          </button>
+          <button
+            type='button'
+            data-testid='diagram-overlay-zoom-in'
+            title={t('preview.zoomIn')}
+            style={toolbarButtonStyle}
+            onClick={() => zoomBy(BUTTON_ZOOM_FACTOR)}
+          >
+            <ZoomIn theme='outline' size='16' fill='var(--text-secondary)' />
+          </button>
+          <button
+            type='button'
+            data-testid='diagram-overlay-zoom-reset'
+            title={t('preview.zoomReset')}
+            style={toolbarButtonStyle}
+            onClick={resetView}
+          >
+            <Refresh theme='outline' size='16' fill='var(--text-secondary)' />
+          </button>
+          {sourceCode && (
+            <button
+              type='button'
+              data-testid='diagram-overlay-copy-source'
+              title={t('preview.diagramCopySource')}
+              style={toolbarButtonStyle}
+              onClick={handleCopySource}
+            >
+              <Copy theme='outline' size='16' fill='var(--text-secondary)' />
+            </button>
+          )}
+          <button
+            type='button'
+            data-testid='diagram-overlay-copy-image'
+            title={t('preview.diagramCopyImage')}
+            style={toolbarButtonStyle}
+            onClick={handleCopyImage}
+          >
+            <Picture theme='outline' size='16' fill='var(--text-secondary)' />
+          </button>
+          <div ref={saveMenuRef} style={{ position: 'relative', display: 'flex' }}>
+            <button
+              type='button'
+              data-testid='diagram-overlay-save-image'
+              title={t('preview.diagramSaveImage')}
+              style={toolbarButtonStyle}
+              onClick={() => setSaveMenuOpen((open) => !open)}
+            >
+              <Download theme='outline' size='16' fill='var(--text-secondary)' />
+            </button>
+            {saveMenuOpen && (
+              <div
+                data-testid='diagram-overlay-save-menu'
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 4px)',
+                  right: 0,
+                  zIndex: 10002,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  padding: '4px',
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--bg-3)',
+                  borderRadius: '6px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                }}
+              >
+                <button
+                  type='button'
+                  data-testid='diagram-overlay-save-svg'
+                  style={saveMenuItemStyle}
+                  onClick={() => {
+                    setSaveMenuOpen(false);
+                    handleSaveImage('svg');
+                  }}
+                >
+                  {t('preview.diagramFormatSvg')}
+                </button>
+                <button
+                  type='button'
+                  data-testid='diagram-overlay-save-png'
+                  style={saveMenuItemStyle}
+                  onClick={() => {
+                    setSaveMenuOpen(false);
+                    handleSaveImage('png');
+                  }}
+                >
+                  {t('preview.diagramFormatPng')}
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            type='button'
+            data-testid='diagram-overlay-close'
+            title={t('common.close')}
+            style={toolbarButtonStyle}
+            onClick={onClose}
+          >
+            <Close theme='outline' size='16' fill='var(--text-secondary)' />
+          </button>
+        </div>
+      </div>
+
+      <div
+        key={contentKey}
+        data-testid='diagram-zoom-content'
+        onPointerDown={handlePanPointerDown}
+        onPointerMove={handlePanPointerMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        style={{
+          padding: '12px',
+          background: cardBackground ?? 'var(--bg-1)',
+          borderRadius: '8px',
+          flexShrink: 0,
+          cursor: isPanning ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          touchAction: 'none',
+          transform: diagramTransform,
+          ...contentStyle,
+        }}
+        dangerouslySetInnerHTML={{ __html: overlaySvg }}
+      />
+
+      {/* Bottom gallery footer — like a photo album: compact prev/counter/next
+          cluster and the clickable thumbnail strip. The title lives in the top
+          bar next to the toolbar; the interaction hints live behind the top
+          bar's help button. */}
+      <div
+        data-testid='diagram-gallery-footer'
+        style={{
+          position: 'fixed',
+          bottom: isSmallScreen ? '8px' : '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10001,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '10px',
+          maxWidth: '92vw',
+        }}
+      >
+        {/* Nav cluster: prev / counter / next grouped in one compact pill, like
+            a photo album — the buttons stay adjacent to the counter and never
+            drift to the far ends of the screen. */}
+        {itemCount > 1 && (
+          <div
+            data-testid='diagram-gallery-nav'
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--bg-3)',
+              borderRadius: '8px',
+            }}
+          >
+            <button
+              type='button'
+              data-testid='diagram-gallery-prev'
+              title={t('preview.diagramGalleryPrev')}
+              aria-label={t('preview.diagramGalleryPrev')}
+              style={{ ...navClusterButtonStyle, opacity: canPrev ? 1 : 0.35 }}
+              onClick={() => navigateBy(-1)}
+            >
+              <ArrowLeft theme='outline' size='18' fill='var(--text-secondary)' />
+            </button>
+            <span
+              data-testid='diagram-gallery-counter'
+              style={{
+                minWidth: '52px',
+                textAlign: 'center',
+                color: 'var(--text-secondary)',
+                fontSize: '13px',
+                lineHeight: '20px',
+                userSelect: 'none',
+              }}
+            >
+              {t('preview.diagramGalleryCounter', { current: activeIndex + 1, total: itemCount })}
+            </span>
+            <button
+              type='button'
+              data-testid='diagram-gallery-next'
+              title={t('preview.diagramGalleryNext')}
+              aria-label={t('preview.diagramGalleryNext')}
+              style={{ ...navClusterButtonStyle, opacity: canNext ? 1 : 0.35 }}
+              onClick={() => navigateBy(1)}
+            >
+              <ArrowRight theme='outline' size='18' fill='var(--text-secondary)' />
+            </button>
+          </div>
+        )}
+
+        {itemCount > 1 && (
+          <div
+            ref={thumbnailsRef}
+            data-testid='diagram-gallery-thumbs'
+            style={{
+              display: 'flex',
+              gap: '6px',
+              maxWidth: 'min(72vw, 880px)',
+              overflowX: 'auto',
+              padding: '4px',
+            }}
+          >
+            {(items ?? []).map((item, index) => {
+              const isActive = item.id === activeId;
+              return (
+                <button
+                  key={item.id}
+                  type='button'
+                  data-testid='diagram-gallery-thumb'
+                  data-active={isActive}
+                  title={item.title}
+                  aria-label={t('preview.diagramGalleryCounter', { current: index + 1, total: itemCount })}
+                  onClick={() => onNavigate?.(item.id)}
+                  style={{
+                    flexShrink: 0,
+                    width: isSmallScreen ? '48px' : '56px',
+                    height: isSmallScreen ? '38px' : '44px',
+                    padding: '2px',
+                    border: '2px solid',
+                    borderColor: isActive ? 'var(--color-primary-6, #165dff)' : 'var(--bg-3)',
+                    borderRadius: '6px',
+                    background: item.panelBackground ?? 'var(--bg-1)',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
+                    dangerouslySetInnerHTML={{ __html: stripInlineMaxWidth(item.svg) }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+export default React.memo(DiagramZoomOverlay);

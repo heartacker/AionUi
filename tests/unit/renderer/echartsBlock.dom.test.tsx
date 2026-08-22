@@ -1,8 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import EchartsBlock from '@/renderer/components/Markdown/EchartsBlock';
-import { parseEChartsOption } from '@/renderer/components/Markdown/echartsUtils';
+import EchartsBlock from '@/renderer/components/Markdown/diagrams/EchartsBlock';
+import { parseEChartsOption } from '@/renderer/components/Markdown/diagrams/echartsUtils';
 
 const mockInit = vi.fn();
 const mockSetOption = vi.fn();

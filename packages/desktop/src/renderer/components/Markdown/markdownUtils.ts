@@ -242,6 +242,22 @@ export const getDiffLineStyle = (line: string, isDark: boolean): React.CSSProper
 export type DiagramSize = { width: number; height: number };
 
 /**
+ * First meaningful source line to display as a diagram's title. Mermaid source
+ * starts with `%%{init: ...}` directive lines — skip those (a directive reads as
+ * "%%{init:{...}" which is noise as a title). WaveDrom is JSON5: skip comments
+ * and punctuation-only lines like the opening `{`.
+ */
+export const getDiagramSummary = (code: string, kind: 'mermaid' | 'wavedrom'): string | undefined =>
+  code
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => {
+      if (!line) return false;
+      if (kind === 'mermaid') return !line.startsWith('%%');
+      return !/^[{}[\],]*$/.test(line) && !line.startsWith('//');
+    });
+
+/**
  * Cap an inline SVG diagram at min(container, natural width): narrow diagrams
  * (e.g. top-down layouts) render 1:1 at their natural size instead of being
  * stretched across the message column; wide diagrams still fit the column.

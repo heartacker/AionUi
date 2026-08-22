@@ -8,6 +8,7 @@ import { joinPath } from '@/common/chat/chatLib';
 import { ipcBridge } from '@/common';
 import type { ChatFileRef } from '@/common/types/chatFile';
 import CodeBlock from '@/renderer/components/Markdown/CodeBlock';
+import { DiagramGalleryProvider } from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
 import LocalFileLink from '@/renderer/components/Markdown/LocalFileLink';
 import {
   MARKDOWN_REMARK_PLUGINS,
@@ -345,50 +346,52 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
   );
 
   return (
-    <div className='flex flex-col w-full h-full overflow-hidden'>
-      {/* 内容区域 / Content area */}
-      <div
-        ref={containerRef}
-        className={`flex-1 ${viewMode === 'source' ? 'overflow-hidden' : 'overflow-auto p-32px text-t-primary'}`}
-        style={{ minWidth: 0 }}
-      >
-        {viewMode === 'source' ? (
-          // 原文模式：使用编辑器 / Source mode: Use editor
-          <MarkdownEditor value={content} onChange={(value) => onContentChange?.(value)} />
-        ) : (
-          // 预览模式：react-markdown + KaTeX / Preview mode: react-markdown + KaTeX
-          <div
-            className='aionui-markdown'
-            style={{
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              width: '100%',
-              maxWidth: '100%',
-              minWidth: 0,
-              boxSizing: 'border-box',
-            }}
-          >
-            <ReactMarkdown
-              remarkPlugins={MARKDOWN_REMARK_PLUGINS}
-              rehypePlugins={SANITIZED_HTML_REHYPE_PLUGINS}
-              components={components}
+    <DiagramGalleryProvider>
+      <div className='flex flex-col w-full h-full overflow-hidden'>
+        {/* 内容区域 / Content area */}
+        <div
+          ref={containerRef}
+          className={`flex-1 ${viewMode === 'source' ? 'overflow-hidden' : 'overflow-auto p-32px text-t-primary'}`}
+          style={{ minWidth: 0 }}
+        >
+          {viewMode === 'source' ? (
+            // 原文模式：使用编辑器 / Source mode: Use editor
+            <MarkdownEditor value={content} onChange={(value) => onContentChange?.(value)} />
+          ) : (
+            // 预览模式：react-markdown + KaTeX / Preview mode: react-markdown + KaTeX
+            <div
+              className='aionui-markdown'
+              style={{
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                width: '100%',
+                maxWidth: '100%',
+                minWidth: 0,
+                boxSizing: 'border-box',
+              }}
             >
-              {previewSource}
-            </ReactMarkdown>
-          </div>
+              <ReactMarkdown
+                remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+                rehypePlugins={SANITIZED_HTML_REHYPE_PLUGINS}
+                components={components}
+              >
+                {previewSource}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+
+        {/* 文本选择浮动工具栏 / Text selection floating toolbar */}
+        {selectedText && (
+          <SelectionToolbar
+            selectedText={selectedText}
+            selectedUrl={selectedUrl}
+            position={selectionPosition}
+            onClear={clearSelection}
+          />
         )}
       </div>
-
-      {/* 文本选择浮动工具栏 / Text selection floating toolbar */}
-      {selectedText && (
-        <SelectionToolbar
-          selectedText={selectedText}
-          selectedUrl={selectedUrl}
-          position={selectionPosition}
-          onClear={clearSelection}
-        />
-      )}
-    </div>
+    </DiagramGalleryProvider>
   );
 };
 

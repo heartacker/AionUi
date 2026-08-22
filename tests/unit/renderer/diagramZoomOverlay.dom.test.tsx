@@ -12,6 +12,19 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+vi.mock('@arco-design/web-react', () => ({
+  Message: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/renderer/utils/ui/clipboard', () => ({
+  copyText: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/renderer/components/Markdown/diagrams/diagramExport', () => ({
+  copySvgImage: vi.fn().mockResolvedValue(undefined),
+  saveDiagramImage: vi.fn().mockResolvedValue(undefined),
+}));
+
 const makeIcon = vi.hoisted(() => (name: string) => () => <span data-icon={name} />);
 
 vi.mock('@icon-park/react', () => ({
@@ -19,9 +32,15 @@ vi.mock('@icon-park/react', () => ({
   ZoomIn: makeIcon('zoom-in'),
   ZoomOut: makeIcon('zoom-out'),
   Refresh: makeIcon('refresh'),
+  ArrowLeft: makeIcon('arrow-left'),
+  ArrowRight: makeIcon('arrow-right'),
+  Copy: makeIcon('copy'),
+  Picture: makeIcon('picture'),
+  Download: makeIcon('download'),
+  Help: makeIcon('help'),
 }));
 
-import DiagramZoomOverlay from '@/renderer/components/Markdown/DiagramZoomOverlay';
+import DiagramZoomOverlay from '@/renderer/components/Markdown/diagrams/DiagramZoomOverlay';
 
 // jsdom lacks the pointer capture API used by the drag handlers.
 beforeAll(() => {
@@ -68,16 +87,18 @@ const renderOverlay = (onClose = vi.fn(), svg = SVG_WIDE, ariaLabel = 'Diagram')
   render(<DiagramZoomOverlay svg={svg} onClose={onClose} ariaLabel={ariaLabel} />);
 
 describe('DiagramZoomOverlay', () => {
-  it('renders toolbar controls and the interaction hint over the page', () => {
+  it('renders toolbar controls including the help button over the page', () => {
     renderOverlay(undefined, SVG_WIDE, 'WaveDrom Diagram');
     const overlay = screen.getByTestId('diagram-zoom-overlay');
     expect(overlay).toBeInTheDocument();
     expect(overlay).toHaveAttribute('aria-label', 'WaveDrom Diagram');
+    expect(screen.getByTestId('diagram-overlay-help')).toBeInTheDocument();
     expect(screen.getByTestId('diagram-overlay-zoom-in')).toBeInTheDocument();
     expect(screen.getByTestId('diagram-overlay-zoom-out')).toBeInTheDocument();
     expect(screen.getByTestId('diagram-overlay-zoom-reset')).toBeInTheDocument();
     expect(screen.getByTestId('diagram-overlay-close')).toBeInTheDocument();
-    expect(screen.getByTestId('diagram-zoom-hint')).toHaveTextContent('preview.diagramZoomHint');
+    // The bottom hint line is gone — hints moved behind the help button.
+    expect(screen.queryByTestId('diagram-zoom-hint')).toBeNull();
     // Without an explicit backdrop the card keeps the --bg-1 token default.
     expect(getContent().style.background).toBe('var(--bg-1)');
   });

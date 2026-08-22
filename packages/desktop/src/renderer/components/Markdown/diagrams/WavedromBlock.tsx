@@ -17,8 +17,9 @@ import { Message } from '@arco-design/web-react';
 import { Copy, PreviewOpen, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { copyText } from '@/renderer/utils/ui/clipboard';
+import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
-import { withResponsiveSvg } from './markdownUtils';
+import { getDiagramSummary, withResponsiveSvg } from '../markdownUtils';
 
 type WavedromBlockProps = {
   code: string;
@@ -187,7 +188,6 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
 
   // Pan/zoom transform for the rendered diagram (only used when enablePanZoom).
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
-  const [isZoomOpen, setIsZoomOpen] = useState(false);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -228,32 +228,47 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
   );
 
   // Restore the user's preferred view once a fresh diagram renders; invalid
-  // input stays on the source view. A re-render also replaces the overlay
-  // content, so reset the pan/zoom view and close the overlay — a fresh diagram
-  // must never leave the user staring at an off-screen, zoomed-in fragment of
-  // the previous one.
+  // input stays on the source view. A re-render also resets the inline pan/zoom
+  // view — a fresh diagram must never leave the user staring at an off-screen,
+  // zoomed-in fragment of the previous one.
   useEffect(() => {
     setViewMode(svg ? (preferredViewModeRef.current === 'source' ? 'source' : 'preview') : 'source');
     setTransform({ scale: 1, x: 0, y: 0 });
-    setIsZoomOpen(false);
   }, [svg]);
 
   const codeTheme = currentTheme === 'dark' ? vs2015 : vs;
   // Backdrop for the rendered diagram (and the zoom overlay card): stays in
   // lock-step with the skin via the shared render theme, see PANEL_BG above.
   const panelBackground = PANEL_BG[renderTheme];
-  // First non-empty line of the source doubles as the preview panel title,
-  // truncated to 48 chars; memoized since it only changes with the source or
-  // the locale.
+  // First meaningful source line doubles as the preview panel title, truncated
+  // to 48 chars; memoized since it only changes with the source or the locale.
+  // The raw summary is also the gallery item's display title.
+  const summary = getDiagramSummary(code, 'wavedrom');
   const previewTitle = useMemo(() => {
-    const summary = code
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find(Boolean);
     return summary && summary.length > 0
       ? `${t('preview.wavedromTitle')}: ${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}`
       : t('preview.wavedromTitle');
-  }, [code, t]);
+  }, [summary, t]);
+
+  // Session gallery entry: only registered while a rendered diagram is actually
+  // on screen (preview mode), so source-only blocks never clutter the stream.
+  // The card backdrop rides along — WaveDrom strokes depend on it (see PANEL_BG).
+  const galleryItem = useMemo(
+    () =>
+      svg && viewMode === 'preview'
+        ? {
+            id: String(idRef.current),
+            svg,
+            code,
+            type: 'wavedrom' as const,
+            title:
+              summary && summary.length > 0 ? `${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}` : undefined,
+            panelBackground,
+          }
+        : null,
+    [svg, viewMode, code, summary, panelBackground]
+  );
+  const gallery = useDiagramGallery(galleryItem);
 
   const zoomBy = (delta: number) =>
     setTransform((prev) => ({
@@ -305,7 +320,12 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setIsPanning(false);
-    if (isClick) setIsZoomOpen(true);
+    // Open one tick after pointerup: the browser dispatches the tap's click
+    // event right after pointerup, and if the overlay mounted before it the
+    // click would land on the overlay backdrop and close it instantly
+    // (the "flashes then closes" bug on touch). Deferring lets the click hit
+    // the original block, which is a no-op.
+    if (isClick) setTimeout(() => gallery.openGallery(String(idRef.current)), 0);
   };
 
   return (
@@ -487,7 +507,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
                 justifyContent: 'center',
                 cursor: 'zoom-in',
               }}
-              onClick={() => setIsZoomOpen(true)}
+              onClick={() => gallery.openGallery(String(idRef.current))}
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           )
@@ -510,10 +530,11 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
           />
         )}
       </div>
-      {isZoomOpen && svg && (
+      {gallery.localOpen && svg && (
         <DiagramZoomOverlay
           svg={svg}
-          onClose={() => setIsZoomOpen(false)}
+          code={code}
+          onClose={() => gallery.setLocalOpenId(null)}
           ariaLabel={t('preview.wavedromTitle')}
           panelBackground={panelBackground}
         />

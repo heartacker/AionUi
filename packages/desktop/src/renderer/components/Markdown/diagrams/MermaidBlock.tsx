@@ -12,10 +12,11 @@ import { copyText } from '@/renderer/utils/ui/clipboard';
 import { Message } from '@arco-design/web-react';
 import { Copy, PreviewOpen, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
-import { withResponsiveSvg } from './markdownUtils';
+import { getDiagramSummary, withResponsiveSvg } from '../markdownUtils';
 
 type MermaidBlockProps = {
   code: string;
@@ -63,7 +64,6 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
 
   // Pan/zoom transform for the rendered diagram (only used when enablePanZoom).
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
-  const [isZoomOpen, setIsZoomOpen] = useState(false);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -74,7 +74,7 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
   } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
 
-  // NOTE: the fresh-diagram reset (transform + overlay) happens inline in the
+  // NOTE: the fresh-diagram reset (transform) happens inline in the
   // render effect below, batched together with setSvg. Keeping it in a separate
   // [svg] effect left a window where the post-commit reset could land after a
   // user's first zoom click and silently swallow it (flaky on slow CI runners).
@@ -129,7 +129,12 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setIsPanning(false);
-    if (isClick) setIsZoomOpen(true);
+    // Open one tick after pointerup: the browser dispatches the tap's click
+    // event right after pointerup, and if the overlay mounted before it the
+    // click would land on the overlay backdrop and close it instantly
+    // (the "flashes then closes" bug on touch). Deferring lets the click hit
+    // the original block, which is a no-op.
+    if (isClick) setTimeout(() => gallery.openGallery(blockIdRef.current), 0);
   };
 
   useEffect(() => {
@@ -203,10 +208,24 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
 
   const codeTheme = currentTheme === 'dark' ? vs2015 : vs;
   const shouldShowLoading = isRendering && preferredViewModeRef.current !== 'source';
-  const summary = code
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean);
+  const summary = getDiagramSummary(code, 'mermaid');
+  // Session gallery entry: only registered while a rendered diagram is actually
+  // on screen (preview mode), so source-only blocks never clutter the stream.
+  const galleryItem = useMemo(
+    () =>
+      svg && viewMode === 'preview'
+        ? {
+            id: blockIdRef.current,
+            svg,
+            code,
+            type: 'mermaid' as const,
+            title:
+              summary && summary.length > 0 ? `${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}` : undefined,
+          }
+        : null,
+    [svg, viewMode, code, summary]
+  );
+  const gallery = useDiagramGallery(galleryItem);
   const previewTitle =
     summary && summary.length > 0
       ? `${t('preview.mermaidTitle')}: ${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}`
@@ -392,7 +411,7 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
                 justifyContent: 'center',
                 cursor: 'zoom-in',
               }}
-              onClick={() => setIsZoomOpen(true)}
+              onClick={() => gallery.openGallery(blockIdRef.current)}
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           )
@@ -444,8 +463,13 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
           />
         )}
       </div>
-      {isZoomOpen && svg && (
-        <DiagramZoomOverlay svg={svg} onClose={() => setIsZoomOpen(false)} ariaLabel={t('preview.mermaidTitle')} />
+      {gallery.localOpen && svg && (
+        <DiagramZoomOverlay
+          svg={svg}
+          code={code}
+          onClose={() => gallery.setLocalOpenId(null)}
+          ariaLabel={t('preview.mermaidTitle')}
+        />
       )}
     </div>
   );

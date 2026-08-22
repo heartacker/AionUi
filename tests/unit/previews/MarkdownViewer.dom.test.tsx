@@ -77,7 +77,7 @@ vi.mock('@/renderer/pages/conversation/Preview/hooks/useScrollSyncHelpers', () =
   useContainerScrollTarget: vi.fn(),
 }));
 
-vi.mock('@/renderer/components/Markdown/MermaidBlock', () => ({
+vi.mock('@/renderer/components/Markdown/diagrams/MermaidBlock', () => ({
   default: () => <div data-testid='mermaid-block' />,
 }));
 

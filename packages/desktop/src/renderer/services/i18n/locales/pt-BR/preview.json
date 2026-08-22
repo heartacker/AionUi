@@ -177,5 +177,16 @@
   "zoomIn": "Ampliar",
   "zoomOut": "Reduzir",
   "zoomReset": "Redefinir visualização",
-  "diagramZoomHint": "Role para ampliar • Arraste para mover • ESC para fechar"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "Role para ampliar • Arraste para mover • ←/→ para navegar • ESC para fechar",
+  "diagramGalleryNext": "Próximo diagrama",
+  "diagramGalleryPrev": "Diagrama anterior",
+  "diagramCopySource": "Copiar código-fonte",
+  "diagramCopyImage": "Copiar imagem",
+  "diagramSaveImage": "Salvar imagem",
+  "diagramImageExportFailed": "Falha ao exportar a imagem",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "Pinçar para ampliar • Arrastar para mover • Deslizar para trocar",
+  "diagramGalleryHelp": "Ajuda"
 }
