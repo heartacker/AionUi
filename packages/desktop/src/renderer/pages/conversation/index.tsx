@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import useSWR from 'swr';
 import ChatConversation from './components/ChatConversation';
+import { DiagramGalleryProvider } from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { previewScopeKey } from '@/renderer/pages/conversation/Preview/context/previewScope';
 import { setCurrentProject } from '@/renderer/pages/conversation/explorer/currentProjectStore';
@@ -107,7 +108,11 @@ const ChatConversationIndex: React.FC = () => {
   }, [id, isLoading, data, navigate, t]);
 
   if (isLoading) return <Spin loading></Spin>;
-  return <ChatConversation conversation={data ?? undefined}></ChatConversation>;
+  return (
+    <DiagramGalleryProvider>
+      <ChatConversation conversation={data ?? undefined}></ChatConversation>
+    </DiagramGalleryProvider>
+  );
 };
 
 export default ChatConversationIndex;

@@ -177,5 +177,16 @@
   "zoomIn": "Zoom avant",
   "zoomOut": "Zoom arrière",
   "zoomReset": "Réinitialiser la vue",
-  "diagramZoomHint": "Molette pour zoomer • Glisser pour déplacer • Échap pour fermer"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "Molette pour zoomer • Glisser pour déplacer • ←/→ pour naviguer • Échap pour fermer",
+  "diagramGalleryNext": "Diagramme suivant",
+  "diagramGalleryPrev": "Diagramme précédent",
+  "diagramCopySource": "Copier le code source",
+  "diagramCopyImage": "Copier l'image",
+  "diagramSaveImage": "Enregistrer l'image",
+  "diagramImageExportFailed": "Échec de l'export de l'image",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "Pincer pour zoomer • Glisser pour déplacer • Balayer pour changer",
+  "diagramGalleryHelp": "Aide"
 }

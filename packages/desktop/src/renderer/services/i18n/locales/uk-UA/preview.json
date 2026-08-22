@@ -179,5 +179,16 @@
   "zoomIn": "Збільшити",
   "zoomOut": "Зменшити",
   "zoomReset": "Скинути вигляд",
-  "diagramZoomHint": "Колесо — масштаб • Перетягування — панорама • ESC — закрити"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "Колесо — масштаб • Перетягування — панорама • ←/→ — перемикання • ESC — закрити",
+  "diagramGalleryNext": "Наступна діаграма",
+  "diagramGalleryPrev": "Попередня діаграма",
+  "diagramCopySource": "Копіювати вихідний код",
+  "diagramCopyImage": "Копіювати зображення",
+  "diagramSaveImage": "Зберегти зображення",
+  "diagramImageExportFailed": "Не вдалося експортувати зображення",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "Щипок — масштаб • Перетягування — панорама • Свайп — перемикання",
+  "diagramGalleryHelp": "Довідка"
 }

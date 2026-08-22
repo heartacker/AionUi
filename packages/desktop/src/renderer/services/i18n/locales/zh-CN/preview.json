@@ -177,5 +177,16 @@
   "zoomIn": "放大",
   "zoomOut": "缩小",
   "zoomReset": "重置视图",
-  "diagramZoomHint": "滚轮缩放 • 拖拽平移 • ESC 关闭"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "滚轮缩放 • 拖拽平移 • ←/→ 切换图表 • ESC 关闭",
+  "diagramGalleryNext": "下一张图表",
+  "diagramGalleryPrev": "上一张图表",
+  "diagramCopySource": "复制源代码",
+  "diagramCopyImage": "复制图片",
+  "diagramSaveImage": "保存图片",
+  "diagramImageExportFailed": "导出图片失败",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "双指缩放 • 拖拽平移 • 左右滑动切换图表",
+  "diagramGalleryHelp": "帮助"
 }

@@ -177,5 +177,16 @@
   "zoomIn": "Zoom in",
   "zoomOut": "Zoom out",
   "zoomReset": "Reset view",
-  "diagramZoomHint": "Scroll to zoom • Drag to pan • ESC to close"
+  "diagramGalleryCounter": "{{current}} / {{total}}",
+  "diagramGalleryHint": "Scroll to zoom • Drag to pan • ←/→ to browse diagrams • ESC to close",
+  "diagramGalleryNext": "Next diagram",
+  "diagramGalleryPrev": "Previous diagram",
+  "diagramCopySource": "Copy source",
+  "diagramCopyImage": "Copy image",
+  "diagramSaveImage": "Save image",
+  "diagramImageExportFailed": "Failed to export diagram image",
+  "diagramFormatSvg": "SVG",
+  "diagramFormatPng": "PNG",
+  "diagramGalleryHintTouch": "Pinch to zoom • Drag to pan • Swipe to switch diagrams",
+  "diagramGalleryHelp": "Help"
 }

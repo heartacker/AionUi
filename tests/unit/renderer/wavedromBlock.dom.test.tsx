@@ -82,9 +82,12 @@ vi.mock('@icon-park/react', () => ({
   ZoomOut: makeIcon('zoom-out'),
   Refresh: makeIcon('refresh'),
   Close: makeIcon('close'),
+  Picture: makeIcon('picture'),
+  Download: makeIcon('download'),
+  Help: makeIcon('help'),
 }));
 
-import WavedromBlock, { resolveWaveRenderTheme } from '@/renderer/components/Markdown/WavedromBlock';
+import WavedromBlock, { resolveWaveRenderTheme } from '@/renderer/components/Markdown/diagrams/WavedromBlock';
 
 const VALID_WAVEJSON = JSON.stringify({
   signal: [
@@ -142,7 +145,7 @@ describe('WavedromBlock', () => {
 
   it('remaps every near-black fill of the real bundled dark skin', async () => {
     const actual = await vi.importActual<typeof import('wavedrom/skins/dark.js')>('wavedrom/skins/dark.js');
-    const { remapDarkSkinStyle } = await import('@/renderer/components/Markdown/WavedromBlock');
+    const { remapDarkSkinStyle } = await import('@/renderer/components/Markdown/diagrams/WavedromBlock');
     const tree = actual.default.dark as unknown as [string, unknown, [string, unknown, string]];
     const remapped = remapDarkSkinStyle(tree[2][2]);
     expect(remapped).toContain('fill: #4a4a4a');

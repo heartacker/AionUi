@@ -44,9 +44,12 @@ vi.mock('@icon-park/react', () => ({
   ZoomOut: makeIcon('zoom-out'),
   Refresh: makeIcon('refresh'),
   Close: makeIcon('close'),
+  Picture: makeIcon('picture'),
+  Download: makeIcon('download'),
+  Help: makeIcon('help'),
 }));
 
-import WavedromBlock from '@/renderer/components/Markdown/WavedromBlock';
+import WavedromBlock from '@/renderer/components/Markdown/diagrams/WavedromBlock';
 
 const WAVE = JSON.stringify({
   signal: [
