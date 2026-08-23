@@ -103,5 +103,33 @@
   "requestDetails": "Деталі запиту:",
   "delivery": {
     "pending": "Непрочитано"
+  },
+  "exportModal": {
+    "title": "Export Conversation",
+    "subtitle": "Select messages and format, customize roles, and preview export",
+    "scopeTitle": "Export Range",
+    "scopeAll": "All Messages (System logs and tool calls excluded)",
+    "scopeUser": "User Messages Only",
+    "scopeAssistant": "AI Responses Only",
+    "scopeCustom": "Custom Selection",
+    "customSelectionCount": "Selected {{selected}} / {{total}} messages",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "rolesTitle": "Custom Role Nicknames",
+    "userNickname": "User Nickname",
+    "userNicknamePlaceholder": "e.g., User / Alex",
+    "aiNickname": "AI Nickname",
+    "aiNicknamePlaceholder": "e.g., AI / Assistant",
+    "optionsTitle": "Export Options",
+    "format": "Format",
+    "includeTimestamp": "Include Timestamps",
+    "previewTitle": "Export Preview",
+    "previewEmpty": "No messages selected",
+    "copyButton": "Copy to Clipboard",
+    "downloadButton": "Save as File",
+    "copySuccess": "Conversation copied to clipboard",
+    "saveSuccess": "Saved to: {{path}}",
+    "saveFailed": "Failed to save file",
+    "noContentWarning": "No exportable messages found"
   }
 }

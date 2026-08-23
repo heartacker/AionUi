@@ -15,7 +15,7 @@ import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { usePresetAssistantInfo } from '@/renderer/hooks/agent/usePresetAssistantInfo';
 import { iconColors } from '@/renderer/styles/colors';
 import { Button, Dropdown, Menu, Message, Tooltip, Typography } from '@arco-design/web-react';
-import { History } from '@icon-park/react';
+import { History, ShareTwo } from '@icon-park/react';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,7 @@ import { emitter } from '../../../utils/emitter';
 import AcpChat from '../platforms/acp/AcpChat';
 import ChatLayout from './ChatLayout';
 import ChatSlider from './ChatSlider.tsx';
+import ExportConversationModal from '@/renderer/components/chat/ExportConversationModal';
 import AcpModelSelector from '@/renderer/components/agent/AcpModelSelector';
 import AcpRuntimeRestartButton from '@/renderer/components/agent/AcpRuntimeRestartButton';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
@@ -202,12 +203,21 @@ const AionrsConversationPanel: React.FC<{ conversation: AionrsConversation; slid
     [runtimeConfig, t]
   );
 
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+
   const chatLayoutProps = {
     title: conversation.name,
     siderTitle: sliderTitle,
     sider: <ChatSlider conversation={conversation} />,
     headerExtra: (
       <div className='flex items-center gap-8px'>
+        <Tooltip content={t('messages.exportModal.title')}>
+          <Button
+            size='mini'
+            icon={<ShareTwo theme='outline' size='14' fill='currentColor' />}
+            onClick={() => setExportModalVisible(true)}
+          />
+        </Tooltip>
         <CronJobManager conversation_id={conversation.id} cron_job_id={cronJobId} />
         {!isMobile && (
           <AionrsModelSelector
@@ -244,24 +254,34 @@ const AionrsConversationPanel: React.FC<{ conversation: AionrsConversation; slid
   );
 
   return (
-    <ChatLayout {...chatLayoutProps} conversation_id={conversation.id}>
-      <AionrsChat
+    <>
+      <ChatLayout {...chatLayoutProps} conversation_id={conversation.id}>
+        <AionrsChat
+          conversation_id={conversation.id}
+          workspace={conversation.extra.workspace}
+          emptySlot={emptySlot}
+          modelSelection={modelSelection}
+          session_mode={conversation.extra?.session_mode}
+          cron_job_id={cronJobId}
+          loadedSkills={(conversation.extra as { skills?: string[] } | undefined)?.skills}
+          loadedMcpServers={(conversation.extra as { mcp_servers?: string[] } | undefined)?.mcp_servers}
+          loadedMcpStatuses={
+            (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
+          }
+          agent_name={presetAssistantInfo?.name}
+          assistantId={aionrsAssistantId}
+          forkCapability={conversation.fork_capability}
+        />
+      </ChatLayout>
+      <ExportConversationModal
+        visible={exportModalVisible}
         conversation_id={conversation.id}
-        workspace={conversation.extra.workspace}
-        emptySlot={emptySlot}
-        modelSelection={modelSelection}
-        session_mode={conversation.extra?.session_mode}
-        cron_job_id={cronJobId}
-        loadedSkills={(conversation.extra as { skills?: string[] } | undefined)?.skills}
-        loadedMcpServers={(conversation.extra as { mcp_servers?: string[] } | undefined)?.mcp_servers}
-        loadedMcpStatuses={
-          (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
-        }
-        agent_name={presetAssistantInfo?.name}
-        assistantId={aionrsAssistantId}
-        forkCapability={conversation.fork_capability}
+        conversation={conversation}
+        assistantName={presetAssistantInfo?.name}
+        workspace={conversation.extra?.workspace}
+        onCancel={() => setExportModalVisible(false)}
       />
-    </ChatLayout>
+    </>
   );
 };
 
@@ -405,8 +425,19 @@ const ChatConversation: React.FC<{
           agent_name: conversationAgentName,
         };
 
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+
   const headerExtraNode = (
     <div className='flex items-center gap-8px'>
+      {conversation && (
+        <Tooltip content={t('messages.exportModal.title')}>
+          <Button
+            size='mini'
+            icon={<ShareTwo theme='outline' size='14' fill='currentColor' />}
+            onClick={() => setExportModalVisible(true)}
+          />
+        </Tooltip>
+      )}
       {conversation && (
         <div className='shrink-0'>
           <CronJobManager conversation_id={conversation.id} cron_job_id={cronJobId} />
@@ -425,23 +456,33 @@ const ChatConversation: React.FC<{
   );
 
   return (
-    <ChatLayout
-      title={conversation?.name}
-      {...chatLayoutProps}
-      headerExtra={headerExtraNode}
-      siderTitle={sliderTitle}
-      sider={<ChatSlider conversation={conversation} />}
-      workspaceEnabled={workspaceEnabled}
-      previewHosted={Boolean(conversation?.project_id)}
-      workspacePath={conversation?.extra?.workspace}
-      workspacePreferenceKey={conversation?.project_id}
-      isTemporaryWorkspace={
-        (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace
-      }
-      conversation_id={conversation?.id}
-    >
-      {conversationNode}
-    </ChatLayout>
+    <>
+      <ChatLayout
+        title={conversation?.name}
+        {...chatLayoutProps}
+        headerExtra={headerExtraNode}
+        siderTitle={sliderTitle}
+        sider={<ChatSlider conversation={conversation} />}
+        workspaceEnabled={workspaceEnabled}
+        previewHosted={Boolean(conversation?.project_id)}
+        workspacePath={conversation?.extra?.workspace}
+        workspacePreferenceKey={conversation?.project_id}
+        isTemporaryWorkspace={
+          (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace
+        }
+        conversation_id={conversation?.id}
+      >
+        {conversationNode}
+      </ChatLayout>
+      <ExportConversationModal
+        visible={exportModalVisible}
+        conversation_id={conversation?.id}
+        conversation={conversation}
+        assistantName={assistantDisplayName}
+        workspace={conversation?.extra?.workspace}
+        onCancel={() => setExportModalVisible(false)}
+      />
+    </>
   );
 };
 
