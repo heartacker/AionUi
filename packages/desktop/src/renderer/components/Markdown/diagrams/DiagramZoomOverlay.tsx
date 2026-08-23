@@ -23,6 +23,7 @@ import { Message } from '@arco-design/web-react';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { getSvgIntrinsicSize, type DiagramSize } from '../markdownUtils';
 import { copySvgImage, saveDiagramImage, type DiagramExportFormat } from './diagramExport';
+import { prepareMathSvgForExport } from './mathExport';
 import type { DiagramItem } from './DiagramGalleryContext';
 
 /**
@@ -396,9 +397,11 @@ function DiagramZoomOverlay({
   const typeLabel = activeItem
     ? activeItem.type === 'wavedrom'
       ? t('preview.wavedromTitle')
-      : activeItem.type === 'chart'
-        ? t('preview.echartsTitle')
-        : t('preview.mermaidTitle')
+      : activeItem.type === 'math'
+        ? t('preview.mathTitle')
+        : activeItem.type === 'chart'
+          ? t('preview.echartsTitle')
+          : t('preview.mermaidTitle')
     : (ariaLabel ?? '');
   const subtitle = activeItem?.title;
   const dialogAriaLabel =
@@ -465,20 +468,34 @@ function DiagramZoomOverlay({
   };
 
   const handleCopyImage = () => {
-    void copySvgImage(exportSvg)
-      .then(() => {
-        Message.success(t('common.copySuccess'));
-      })
-      .catch(() => {
-        Message.error(t('preview.diagramImageExportFailed'));
-      });
+    // Math SVGs are foreignObject wrappers around KaTeX HTML and rely on the
+    // page stylesheet + theme color; make them standalone before exporting.
+    const run = (readySvg: string) =>
+      copySvgImage(readySvg)
+        .then(() => {
+          Message.success(t('common.copySuccess'));
+        })
+        .catch(() => {
+          Message.error(t('preview.diagramImageExportFailed'));
+        });
+    if (activeItem?.type !== 'math') {
+      void run(exportSvg);
+      return;
+    }
+    void prepareMathSvgForExport(exportSvg).then(run);
   };
 
   const handleSaveImage = (format: DiagramExportFormat) => {
     const extension = format === 'svg' ? 'svg' : 'png';
-    void saveDiagramImage(exportSvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format).catch(() => {
-      Message.error(t('preview.diagramImageExportFailed'));
-    });
+    const run = (readySvg: string) =>
+      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format).catch(() => {
+        Message.error(t('preview.diagramImageExportFailed'));
+      });
+    if (activeItem?.type !== 'math') {
+      void run(exportSvg);
+      return;
+    }
+    void prepareMathSvgForExport(exportSvg).then(run);
   };
 
   // The save button pops a small format menu (SVG preferred, PNG as fallback);

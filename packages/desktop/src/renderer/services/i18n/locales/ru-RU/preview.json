@@ -60,6 +60,7 @@
   "noTabs": "Нет открытых вкладок",
   "openInPanelTooltip": "Просмотреть в панели предпросмотра",
   "mermaidTitle": "Диаграмма Mermaid",
+  "mathTitle": "Математика",
   "wavedromTitle": "Диаграмма WaveDrom",
   "echartsTitle": "График ECharts",
   "oversized": {

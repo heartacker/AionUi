@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React, { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +26,10 @@ vi.mock('@/renderer/utils/ui/clipboard', () => ({
 vi.mock('@/renderer/components/Markdown/diagrams/diagramExport', () => ({
   copySvgImage: vi.fn().mockResolvedValue(undefined),
   saveDiagramImage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/renderer/components/Markdown/diagrams/mathExport', () => ({
+  prepareMathSvgForExport: vi.fn((svg: string) => Promise.resolve(`${svg}-prepared`)),
 }));
 
 const makeIcon = vi.hoisted(() => (name: string) => () => <span data-icon={name} />);
@@ -255,6 +259,22 @@ describe('DiagramZoomOverlay gallery mode', () => {
     );
     fireEvent.click(screen.getByTestId('diagram-overlay-copy-source'));
     expect(copyText).toHaveBeenCalledWith('flowchart TD');
+  });
+
+  it('prepares math diagrams (standalone KaTeX CSS) before copying the image', async () => {
+    render(
+      <DiagramZoomOverlay
+        items={[{ id: 'formula', svg: '<svg viewBox="0 0 10 10"></svg>', type: 'math', code: 'E = mc^2' }]}
+        activeId='formula'
+        onNavigate={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('diagram-gallery-header')).toHaveTextContent('preview.mathTitle');
+    fireEvent.click(screen.getByTestId('diagram-overlay-copy-image'));
+    await waitFor(() => {
+      expect(copySvgImage).toHaveBeenCalledWith('<svg viewBox="0 0 10 10"></svg>-prepared');
+    });
   });
 
   it('swipes left/right with a touch pointer to flip diagrams', () => {

@@ -58,6 +58,9 @@ vi.mock('@/renderer/pages/conversation/Preview/context/PreviewContext', () => ({
   usePreviewContext: () => ({
     openPreview: previewMocks.openPreview,
   }),
+  useOptionalPreviewContext: () => ({
+    openPreview: previewMocks.openPreview,
+  }),
 }));
 
 vi.mock('@/renderer/utils/chat/latexDelimiters', () => ({
@@ -106,6 +109,10 @@ vi.mock('@arco-design/web-react', () => ({
 
 vi.mock('@icon-park/react', () => ({
   Copy: () => <span data-testid='copy-icon' />,
+  ZoomOut: () => <span data-testid='zoom-out-icon' />,
+  ZoomIn: () => <span data-testid='zoom-in-icon' />,
+  Refresh: () => <span data-testid='refresh-icon' />,
+  PreviewOpen: () => <span data-testid='preview-open-icon' />,
 }));
 
 import MarkdownViewer from '@/renderer/pages/conversation/Preview/components/viewers/MarkdownViewer';
@@ -256,6 +263,22 @@ describe('MarkdownViewer', () => {
   it('renders math via KaTeX in preview mode', () => {
     const { container } = render(<MarkdownViewer content='inline $x + y = z$ done' />);
     expect(container.querySelectorAll('.katex')).toHaveLength(1);
+  });
+
+  it('renders a ```math fence through MathBlock (unified with chat), not rehype-katex', async () => {
+    const { container } = render(<MarkdownViewer content={'```math\nE = mc^2\n```'} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('math-diagram')).toBeInTheDocument();
+    });
+    expect(screen.getByText('<math>')).toBeInTheDocument();
+    expect(container.querySelector('.katex')).toBeTruthy();
+  });
+
+  it('renders a paragraph-level $$...$$ block through MathBlock too', async () => {
+    render(<MarkdownViewer content={'Before.\n\n$$E = mc^2$$'} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('math-diagram')).toBeInTheDocument();
+    });
   });
 
   it('continues rendering local image markdown inline', async () => {
