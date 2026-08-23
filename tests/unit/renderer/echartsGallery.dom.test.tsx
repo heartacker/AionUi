@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -40,6 +40,8 @@ vi.mock('react-syntax-highlighter/dist/esm/styles/hljs', () => ({ vs: {}, vs2015
 const mockGetDataURL = vi.fn();
 const mockGetWidth = vi.fn();
 const mockGetHeight = vi.fn();
+const mockOn = vi.fn();
+const mockOff = vi.fn();
 
 vi.mock('echarts', () => ({
   init: () => ({
@@ -49,6 +51,8 @@ vi.mock('echarts', () => ({
     getDataURL: mockGetDataURL,
     getWidth: mockGetWidth,
     getHeight: mockGetHeight,
+    on: mockOn,
+    off: mockOff,
   }),
 }));
 
@@ -115,6 +119,7 @@ afterEach(() => {
     writable: true,
     value: originalMatchMedia,
   });
+  vi.useRealTimers();
 });
 
 const VALID_CHART_CODE = `
@@ -132,56 +137,80 @@ function RegisteringBlock({ item }: { item: DiagramItem }) {
 }
 
 describe('ECharts gallery integration', () => {
+  let finishedCallbacks: Array<() => void>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    stubMatchMedia({});
+    finishedCallbacks = [];
+    mockOn.mockImplementation((_event: string, callback: () => void) => {
+      finishedCallbacks.push(callback);
+    });
     mockGetWidth.mockReturnValue(336);
     mockGetHeight.mockReturnValue(336);
     mockGetDataURL.mockReturnValue('data:image/png;base64,AAAA');
-    stubMatchMedia({});
   });
 
-  it('snapshots the chart once on header double-click and opens it in the gallery', () => {
+  /** Fire every chart's 'finished' event and run the 400ms snapshot debounce. */
+  const settleCharts = () => {
+    act(() => {
+      for (const callback of finishedCallbacks) callback();
+      vi.advanceTimersByTime(400);
+    });
+  };
+
+  it('registers every chart eagerly and opens the gallery on header double-click', () => {
     render(
       <DiagramGalleryProvider>
         <RegisteringBlock item={{ id: 'mermaid-one', svg: '<svg viewBox="0 0 100 100"></svg>', type: 'mermaid' }} />
         <EchartsBlock code={VALID_CHART_CODE} />
       </DiagramGalleryProvider>
     );
-
-    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
+    settleCharts();
 
     expect(mockGetDataURL).toHaveBeenCalledTimes(1);
     expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+
+    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
     expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
     expect(screen.getByTestId('diagram-gallery-header')).toHaveTextContent('preview.echartsTitle');
-    // Both the mermaid item and the chart are in the thumbnail strip.
+    // Both the mermaid item and the eagerly registered chart are in the strip.
     expect(screen.getAllByTestId('diagram-gallery-thumb')).toHaveLength(2);
     expect(screen.getByTestId('diagram-gallery-counter')).toHaveTextContent('2');
   });
 
-  it('reuses the snapshot when reopened and re-snapshots when the source changed', () => {
+  it('includes ALL charts in the gallery stream, not only the opened one', () => {
+    render(
+      <DiagramGalleryProvider>
+        <EchartsBlock code={VALID_CHART_CODE} />
+        <EchartsBlock code={`${VALID_CHART_CODE}\n// second chart`} />
+        <EchartsBlock code={`${VALID_CHART_CODE}\n// third chart`} />
+      </DiagramGalleryProvider>
+    );
+    settleCharts();
+    expect(mockGetDataURL).toHaveBeenCalledTimes(3);
+
+    fireEvent.doubleClick(screen.getAllByTestId('echarts-header')[0]);
+    expect(screen.getByTestId('diagram-gallery-counter')).toHaveTextContent('1');
+    expect(screen.getAllByTestId('diagram-gallery-thumb')).toHaveLength(3);
+  });
+
+  it('re-snapshots when the source changed', () => {
     const { rerender } = render(
       <DiagramGalleryProvider>
         <EchartsBlock code={VALID_CHART_CODE} />
       </DiagramGalleryProvider>
     );
-
-    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
-    expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('diagram-overlay-close'));
-    expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
-
-    // Second open reuses the snapshot — no new getDataURL call.
-    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
+    settleCharts();
     expect(mockGetDataURL).toHaveBeenCalledTimes(1);
 
-    // A changed source re-snapshots.
     rerender(
       <DiagramGalleryProvider>
         <EchartsBlock code={`${VALID_CHART_CODE}\n// changed`} />
       </DiagramGalleryProvider>
     );
-    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
+    settleCharts();
     expect(mockGetDataURL).toHaveBeenCalledTimes(2);
   });
 
@@ -191,6 +220,7 @@ describe('ECharts gallery integration', () => {
         <EchartsBlock code={VALID_CHART_CODE} />
       </DiagramGalleryProvider>
     );
+    settleCharts();
 
     fireEvent.doubleClick(screen.getByTestId('echarts-header'));
     fireEvent.click(screen.getByTestId('diagram-overlay-copy-image'));
@@ -201,10 +231,12 @@ describe('ECharts gallery integration', () => {
     expect(copiedSvg).toContain('<image');
   });
 
-  it('opens a local single-diagram overlay without a provider', () => {
+  it('opens a local single-diagram overlay without a provider (on-demand fallback)', () => {
     render(<EchartsBlock code={VALID_CHART_CODE} />);
 
+    // No settle: the first double-click snapshots on demand.
     fireEvent.doubleClick(screen.getByTestId('echarts-header'));
+    expect(mockGetDataURL).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
     // No gallery chrome: single diagram, no nav/counter/thumbs.
     expect(screen.queryByTestId('diagram-gallery-prev')).toBeNull();
