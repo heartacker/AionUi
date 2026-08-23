@@ -2504,3 +2504,26 @@ export const sidebar = {
     (p) => `/api/sidebar/archived/project/${encodeURIComponent(p.project_id)}`
   ),
 };
+
+// ---------------------------------------------------------------------------
+// Git — Electron-native Git Service
+// ---------------------------------------------------------------------------
+
+export const git = {
+  getLog: bridge.buildProvider<
+    IBridgeResponse<import('@process/services/git/gitGraphParser').ParsedCommit[]>,
+    { repoPath: string; limit?: number }
+  >('git.get-log'),
+  getStatus: bridge.buildProvider<
+    IBridgeResponse<import('@process/services/git/gitService').GitStatusSummary>,
+    { repoPath: string }
+  >('git.get-status'),
+  getCommitDiff: bridge.buildProvider<
+    IBridgeResponse<import('@process/services/git/gitService').GitFileDiff[]>,
+    { repoPath: string; hash: string }
+  >('git.get-commit-diff'),
+  checkout: bridge.buildProvider<
+    IBridgeResponse<{ success: boolean; message: string }>,
+    { repoPath: string; branchName: string }
+  >('git.checkout'),
+};
