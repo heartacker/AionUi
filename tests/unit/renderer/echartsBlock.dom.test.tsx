@@ -1,13 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import EchartsBlock from '@/renderer/components/Markdown/diagrams/EchartsBlock';
-import { parseEChartsOption } from '@/renderer/components/Markdown/diagrams/echartsUtils';
+import { buildChartSnapshotSvg, parseEChartsOption } from '@/renderer/components/Markdown/diagrams/echartsUtils';
 
 const mockInit = vi.fn();
 const mockSetOption = vi.fn();
 const mockDispose = vi.fn();
 const mockResize = vi.fn();
+const mockGetDataURL = vi.fn();
+const mockGetWidth = vi.fn();
+const mockGetHeight = vi.fn();
 
 vi.mock('echarts', () => ({
   init: (...args: unknown[]) => {
@@ -16,9 +19,34 @@ vi.mock('echarts', () => ({
       setOption: mockSetOption,
       dispose: mockDispose,
       resize: mockResize,
+      getDataURL: mockGetDataURL,
+      getWidth: mockGetWidth,
+      getHeight: mockGetHeight,
     };
   },
 }));
+
+/** Override window.matchMedia for touch/hover behavior tests. */
+const stubMatchMedia = (queries: Record<string, boolean>) => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query: string) => ({
+      matches: queries[query] ?? false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+};
+const originalMatchMedia = window.matchMedia;
+afterEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: originalMatchMedia,
+  });
+});
 
 vi.mock('@/renderer/utils/ui/clipboard', () => ({
   copyText: vi.fn().mockResolvedValue(undefined),
@@ -41,6 +69,8 @@ vi.mock('react-i18next', () => ({
         'preview.source': 'Source',
         'preview.openInPanelTooltip': 'Open in panel',
         'preview.renderError': 'Render Error',
+        'preview.diagramGalleryOpenHint': 'Double-click to open',
+        'preview.diagramImageExportFailed': 'Export failed',
         'common.copySuccess': 'Copied',
         'common.copyFailed': 'Copy failed',
       };
@@ -91,9 +121,23 @@ describe('parseEChartsOption', () => {
   });
 });
 
+describe('buildChartSnapshotSvg', () => {
+  it('wraps a data URL in an SVG with pixel dimensions for the gallery', () => {
+    const svg = buildChartSnapshotSvg('data:image/png;base64,AAAA', 672, 336);
+    expect(svg).toContain('width="672"');
+    expect(svg).toContain('height="336"');
+    expect(svg).toContain('viewBox="0 0 672 336"');
+    expect(svg).toContain('href="data:image/png;base64,AAAA"');
+    expect(svg).toContain('width="100%" height="100%"');
+  });
+});
+
 describe('EchartsBlock Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetWidth.mockReturnValue(336);
+    mockGetHeight.mockReturnValue(336);
+    mockGetDataURL.mockReturnValue('data:image/png;base64,AAAA');
   });
 
   const validChartCode = `
@@ -141,5 +185,87 @@ describe('EchartsBlock Component', () => {
       'markdown',
       expect.objectContaining({ title: expect.stringContaining('ECharts Chart') })
     );
+  });
+
+  // The block root carries the hover handlers; reach it from the header.
+  const getRoot = (): HTMLElement =>
+    (screen.getByTestId('echarts-header').parentElement?.parentElement as HTMLElement) ?? document.body;
+
+  it('hides the header actions until the block is hovered', () => {
+    stubMatchMedia({});
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    const actions = screen.getByTestId('echarts-header');
+    expect(actions.style.opacity).toBe('0');
+    expect(actions.style.pointerEvents).toBe('none');
+
+    fireEvent.mouseEnter(getRoot());
+    expect(actions.style.opacity).toBe('1');
+    expect(actions.style.pointerEvents).toBe('auto');
+
+    fireEvent.mouseLeave(getRoot());
+    expect(actions.style.opacity).toBe('0');
+  });
+
+  it('reveals the header actions on tap instead of hover on touch devices', () => {
+    stubMatchMedia({ '(pointer: coarse)': true });
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    const actions = screen.getByTestId('echarts-header');
+    // Hidden by default on touch too — a tap reveals the toolbar.
+    expect(actions.style.opacity).toBe('0');
+
+    fireEvent.click(getRoot());
+    expect(actions.style.opacity).toBe('1');
+    expect(actions.style.pointerEvents).toBe('auto');
+
+    fireEvent.click(getRoot());
+    expect(actions.style.opacity).toBe('0');
+  });
+
+  it('dismisses the revealed toolbar when tapping outside the block', () => {
+    stubMatchMedia({ '(pointer: coarse)': true });
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    fireEvent.click(getRoot());
+    expect(screen.getByTestId('echarts-header').style.opacity).toBe('1');
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.getByTestId('echarts-header').style.opacity).toBe('0');
+  });
+
+  it('does not snapshot when a toggle or action button is double-clicked', () => {
+    stubMatchMedia({});
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    fireEvent.doubleClick(screen.getByTestId('echarts-toggle-preview'));
+    fireEvent.doubleClick(screen.getByTestId('echarts-copy'));
+    expect(mockGetDataURL).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
+  });
+
+  it('does not snapshot in source view (chart instance disposed)', () => {
+    stubMatchMedia({});
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    fireEvent.mouseDown(screen.getByTestId('echarts-toggle-source'), { button: 0 });
+    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
+    expect(mockGetDataURL).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
+  });
+
+  it('snapshots the chart once on header double-click and opens the local overlay', () => {
+    stubMatchMedia({});
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    fireEvent.doubleClick(screen.getByTestId('echarts-header'));
+    expect(mockGetDataURL).toHaveBeenCalledTimes(1);
+    expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+
+    expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
+    const content = screen.getByTestId('diagram-zoom-content');
+    // The snapshot is wrapped as an SVG with 2x pixel dimensions.
+    expect(content.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 672 672');
+    expect(content.innerHTML).toContain('data:image/png;base64,AAAA');
   });
 });

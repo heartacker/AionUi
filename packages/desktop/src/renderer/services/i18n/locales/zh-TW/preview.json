@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "雙指縮放 • 拖曳平移 • 左右滑動切換圖表",
-  "diagramGalleryHelp": "說明"
+  "diagramGalleryHelp": "說明",
+  "diagramGalleryOpenHint": "雙擊標題列在畫冊中查看"
 }

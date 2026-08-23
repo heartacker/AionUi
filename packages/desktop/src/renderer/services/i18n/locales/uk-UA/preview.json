@@ -191,5 +191,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "Щипок — масштаб • Перетягування — панорама • Свайп — перемикання",
-  "diagramGalleryHelp": "Довідка"
+  "diagramGalleryHelp": "Довідка",
+  "diagramGalleryOpenHint": "Двічі клацніть заголовок, щоб відкрити в галереї"
 }

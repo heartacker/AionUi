@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "ピンチでズーム • ドラッグで移動 • スワイプで切り替え",
-  "diagramGalleryHelp": "ヘルプ"
+  "diagramGalleryHelp": "ヘルプ",
+  "diagramGalleryOpenHint": "タイトルバーをダブルクリックしてギャラリーで表示"
 }

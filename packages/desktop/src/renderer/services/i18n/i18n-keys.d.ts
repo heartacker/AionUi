@@ -1344,6 +1344,7 @@ export type I18nKey =
   | 'preview.diagramGalleryHint'
   | 'preview.diagramGalleryHintTouch'
   | 'preview.diagramGalleryNext'
+  | 'preview.diagramGalleryOpenHint'
   | 'preview.diagramGalleryPrev'
   | 'preview.diagramImageExportFailed'
   | 'preview.diagramSaveImage'

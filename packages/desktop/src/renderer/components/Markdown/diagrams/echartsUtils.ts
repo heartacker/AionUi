@@ -95,3 +95,13 @@ export const parseEChartsOption = (code: string): Record<string, unknown> | null
 
   return null;
 };
+
+/**
+ * Wrap a canvas snapshot data URL (e.g. ECharts `getDataURL` output) in an SVG
+ * so the diagram gallery can measure and display it like any other diagram.
+ * `width`/`height` must be the snapshot's pixel dimensions (CSS px ×
+ * pixelRatio) — the viewBox carries them, and the gallery measures via viewBox.
+ */
+export const buildChartSnapshotSvg = (dataUrl: string, width: number, height: number): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+  `<image href="${dataUrl}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" /></svg>`;

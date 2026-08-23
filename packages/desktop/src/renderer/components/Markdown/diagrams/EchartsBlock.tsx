@@ -14,7 +14,10 @@ import { Message } from '@arco-design/web-react';
 import { Copy, PreviewOpen } from '@icon-park/react';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { copyText } from '@/renderer/utils/ui/clipboard';
-import { parseEChartsOption } from './echartsUtils';
+import { useDiagramGallery, type DiagramItem } from './DiagramGalleryContext';
+import DiagramZoomOverlay from './DiagramZoomOverlay';
+import { useToolbarHover } from './useToolbarHover';
+import { buildChartSnapshotSvg, parseEChartsOption } from './echartsUtils';
 
 type EchartsBlockProps = {
   code: string;
@@ -42,6 +45,14 @@ function EchartsBlock({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const blockIdRef = useRef(`echarts-${Math.random().toString(36).slice(2, 10)}`);
+  // Lazy gallery snapshot: built on the first header double-click and reused
+  // afterwards (re-snapshotted when the source changes). ECharts renders to a
+  // canvas whose own interactions swallow clicks, so the header double-click
+  // is the entry point into the gallery for charts.
+  const [chartSnapshot, setChartSnapshot] = useState<DiagramItem | null>(null);
+  const gallery = useDiagramGallery(null);
+  const { toolbarStyle, onMouseEnter, onMouseLeave, onClick, blockRef } = useToolbarHover();
 
   const parsedOption = useMemo(() => parseEChartsOption(code), [code]);
 
@@ -54,6 +65,49 @@ function EchartsBlock({
       ? `${t('preview.echartsTitle')}: ${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}`
       : t('preview.echartsTitle');
   }, [code, t]);
+
+  const previewSummary = useMemo(() => {
+    const summary = code
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean);
+    return summary && summary.length > 0 ? `${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}` : undefined;
+  }, [code]);
+
+  // Snapshot the canvas into an SVG-wrapped PNG data URL and open it in the
+  // gallery. The wrapper reuses the gallery's viewBox-based measurement, so
+  // the chart behaves exactly like the SVG-based diagram types.
+  const handleHeaderDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const interactive = target.closest?.('button, [data-testid]');
+    if (interactive && interactive !== event.currentTarget) return;
+
+    const chart = chartInstanceRef.current;
+    if (!chart) return; // source view / render error: the instance is disposed
+
+    if (chartSnapshot && chartSnapshot.code === code) {
+      gallery.openGallery(chartSnapshot.id);
+      return;
+    }
+
+    try {
+      const width = Math.round(chart.getWidth() * 2);
+      const height = Math.round(chart.getHeight() * 2);
+      const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+      if (width < 1 || height < 1 || !dataUrl) return;
+      const item: DiagramItem = {
+        id: blockIdRef.current,
+        svg: buildChartSnapshotSvg(dataUrl, width, height),
+        code,
+        type: 'chart',
+        title: previewSummary,
+      };
+      setChartSnapshot(item);
+      gallery.openGalleryWithItem(item);
+    } catch {
+      Message.error(t('preview.diagramImageExportFailed'));
+    }
+  };
 
   const initOrUpdateChart = useCallback(() => {
     if (!containerRef.current || !parsedOption) {
@@ -130,7 +184,13 @@ function EchartsBlock({
   const codeTheme = isDarkTheme ? vs2015 : vs;
 
   return (
-    <div style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}>
+    <div
+      ref={blockRef}
+      style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onClick={onClick}
+    >
       <div
         style={{
           border: '1px solid var(--bg-3)',
@@ -141,6 +201,8 @@ function EchartsBlock({
       >
         <div
           data-testid='echarts-header'
+          title={t('preview.diagramGalleryOpenHint')}
+          onDoubleClick={handleHeaderDoubleClick}
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -148,6 +210,7 @@ function EchartsBlock({
             backgroundColor: 'var(--bg-2)',
             padding: '6px 10px',
             borderBottom: '1px solid var(--bg-3)',
+            ...toolbarStyle,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -208,7 +271,10 @@ function EchartsBlock({
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div
+            data-testid='echarts-header-actions'
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+          >
             {showOpenInPanelButton && (
               <PreviewOpen
                 data-testid='echarts-open-in-panel'
@@ -275,6 +341,14 @@ function EchartsBlock({
           />
         )}
       </div>
+      {gallery.localOpen && gallery.localItem && (
+        <DiagramZoomOverlay
+          svg={gallery.localItem.svg}
+          code={code}
+          onClose={() => gallery.setLocalOpenId(null)}
+          ariaLabel={t('preview.echartsTitle')}
+        />
+      )}
     </div>
   );
 }
