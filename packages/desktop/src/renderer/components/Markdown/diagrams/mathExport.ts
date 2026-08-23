@@ -17,8 +17,10 @@
  */
 
 // Vertical/horizontal padding around the measured formula so italic overhangs
-// and tall glyphs never clip at the foreignObject edge.
-export const MATH_SVG_PADDING = 8;
+// and tall glyphs never clip at the foreignObject edge. Glyph overhangs scale
+// with the font, so this must be generous: the layout box that is measured
+// excludes what the glyphs actually paint outside it.
+export const MATH_SVG_PADDING = 16;
 
 /** Match the opening tag of KaTeX's display-mode wrapper span. */
 const KATEX_DISPLAY_OPENING = '<span class="katex-display"';
