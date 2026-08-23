@@ -1386,6 +1386,7 @@ export type I18nKey =
   | 'preview.html.selectedLabel'
   | 'preview.html.viewElementInfo'
   | 'preview.loading'
+  | 'preview.mathTitle'
   | 'preview.maximizePanel'
   | 'preview.mermaidTitle'
   | 'preview.missingFile.openInNewTab'

@@ -58,6 +58,7 @@
   "noTabs": "タブはありません",
   "openInPanelTooltip": "プレビューパネルで表示",
   "mermaidTitle": "Mermaid 図",
+  "mathTitle": "数式",
   "wavedromTitle": "WaveDrom 波形図",
   "echartsTitle": "ECharts グラフ",
   "oversized": {

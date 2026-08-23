@@ -6,7 +6,6 @@
 
 import { Message } from '@arco-design/web-react';
 import { Copy, Down, Up } from '@icon-park/react';
-import katex from 'katex';
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import SyntaxHighlighter from 'react-syntax-highlighter';
@@ -15,6 +14,7 @@ import { copyText } from '@/renderer/utils/ui/clipboard';
 import MermaidBlock from './diagrams/MermaidBlock';
 import WavedromBlock from './diagrams/WavedromBlock';
 import EchartsBlock from './diagrams/EchartsBlock';
+import MathBlock from './diagrams/MathBlock';
 import { formatCode, getDiffLineStyle } from './markdownUtils';
 
 const PREVIEW_LINES = 3;
@@ -76,17 +76,15 @@ function CodeBlock(props: CodeBlockProps) {
   const match = /language-(\w+)/.exec(className || '');
   const language = match?.[1] || 'text';
 
-  // KaTeX math blocks
+  // KaTeX math blocks — unified with the diagram pipeline everywhere (chat and
+  // file preview): MathBlock renders the formula with the same header, pan/zoom,
+  // gallery and export model as Mermaid/WaveDrom. Full LaTeX documents stay
+  // plain code; inline $...$ math is handled by rehype-katex, not here.
   if (language === 'latex' || language === 'math' || language === 'tex') {
     const latexSource = String(children).replace(/\n$/, '');
     const isFullDocument = /\\(documentclass|begin\{document\}|usepackage)\b/.test(latexSource);
     if (!isFullDocument) {
-      try {
-        const html = katex.renderToString(latexSource, { displayMode: true, throwOnError: false });
-        return <div className='katex-display' dangerouslySetInnerHTML={{ __html: html }} />;
-      } catch {
-        // fall through
-      }
+      return <MathBlock code={formatCode(children)} style={props.codeStyle} enablePanZoom={props.diagramPanZoom} />;
     }
   }
 

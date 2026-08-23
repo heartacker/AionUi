@@ -19,6 +19,8 @@ import classNames from 'classnames';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertLatexDelimiters } from '@renderer/utils/chat/latexDelimiters';
+import { convertDisplayMathToFences } from '@renderer/utils/chat/convertDisplayMathToFences';
+import { relabelMathFences } from '@renderer/utils/chat/relabelMathFences';
 import LocalImageView from '@renderer/components/media/LocalImageView';
 import CodeBlock from './CodeBlock';
 import LocalFileLink from './LocalFileLink';
@@ -53,6 +55,12 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
       if (typeof childrenProp === 'string') {
         let text = childrenProp.replace(/file:\/\//g, '');
         text = convertLatexDelimiters(text);
+        // Paragraph-level $$...$$ becomes a `latex` fence so display math goes
+        // through MathBlock (unified diagram view); ```math fences are
+        // relabeled so rehype-katex does not intercept them before CodeBlock.
+        // Inline $...$ still renders via rehype-katex below.
+        text = convertDisplayMathToFences(text);
+        text = relabelMathFences(text);
         return text;
       }
       return childrenProp;

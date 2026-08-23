@@ -26,6 +26,8 @@ import SelectionToolbar from '../renderers/SelectionToolbar';
 import { useContainerScroll, useContainerScrollTarget } from '../../hooks/useScrollSyncHelpers';
 import { useLocalFilePreview } from '../../hooks';
 import { convertLatexDelimiters } from '@/renderer/utils/chat/latexDelimiters';
+import { convertDisplayMathToFences } from '@/renderer/utils/chat/convertDisplayMathToFences';
+import { relabelMathFences } from '@/renderer/utils/chat/relabelMathFences';
 
 interface MarkdownPreviewProps {
   content: string; // Markdown 内容 / Markdown content
@@ -293,8 +295,17 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
   const viewMode = externalViewMode ?? 'preview';
 
   // 预览源：转换 LaTeX 分隔符并重写外部媒体 URL / Preview source: convert LaTeX delimiters and rewrite external media URLs
+  // Math is unified with the chat pipeline: paragraph-level $$...$$ becomes a
+  // `latex` fence and ```math fences are relabeled, so display math renders
+  // through MathBlock (header/pan-zoom/gallery/export) here too. Inline $...$
+  // still renders via rehype-katex.
   const previewSource = useMemo(
-    () => convertLatexDelimiters(normalizeLocalFileSchemeLinks(rewriteExternalMediaUrls(content))),
+    () =>
+      relabelMathFences(
+        convertDisplayMathToFences(
+          convertLatexDelimiters(normalizeLocalFileSchemeLinks(rewriteExternalMediaUrls(content)))
+        )
+      ),
     [content]
   );
 

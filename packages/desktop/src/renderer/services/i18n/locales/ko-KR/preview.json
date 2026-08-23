@@ -58,6 +58,7 @@
   "noTabs": "열린 탭 없음",
   "openInPanelTooltip": "미리보기 패널에서 보기",
   "mermaidTitle": "Mermaid 다이어그램",
+  "mathTitle": "수식",
   "wavedromTitle": "WaveDrom 파형도",
   "echartsTitle": "ECharts 차트",
   "oversized": {
