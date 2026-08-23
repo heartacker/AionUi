@@ -25,6 +25,16 @@ describe('buildMathSvg', () => {
     const svg = buildMathSvg('<span class="katex-display"></span>', 0, -5, 'black');
     expect(svg).toContain('width="1" height="1"');
   });
+
+  it('pins the measured base font size into the wrapper so other render contexts match', () => {
+    const svg = buildMathSvg('<span class="katex-display"></span>', 10, 10, 'black', '16px');
+    expect(svg).toContain('font-size:16px;');
+  });
+
+  it('omits the font-size rule when none is provided', () => {
+    const svg = buildMathSvg('<span class="katex-display"></span>', 10, 10, 'black');
+    expect(svg).not.toContain('font-size');
+  });
 });
 
 describe('inlineFontUrls', () => {
