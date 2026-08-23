@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 
@@ -74,6 +74,27 @@ vi.mock('@icon-park/react', () => ({
 }));
 
 import WavedromBlock from '@/renderer/components/Markdown/diagrams/WavedromBlock';
+
+const stubMatchMedia = (queries: Record<string, boolean>) => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query) => ({
+      matches: queries[query] ?? false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+};
+const originalMatchMedia = window.matchMedia;
+afterEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: originalMatchMedia,
+  });
+});
 
 // jsdom lacks the pointer capture API used by the drag handlers.
 beforeAll(() => {
@@ -178,6 +199,35 @@ describe('WavedromBlock pan/zoom', () => {
     expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('diagram-overlay-close'));
+    expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
+  });
+  it('hides the header actions until the block is hovered', async () => {
+    stubMatchMedia({});
+    render(<WavedromBlock code={VALID_WAVEJSON} enablePanZoom />);
+    await screen.findByTestId('wavedrom-diagram');
+    const actions = screen.getByTestId('wavedrom-header');
+    expect(actions.style.opacity).toBe('0');
+    const root = screen.getByTestId('wavedrom-header').parentElement?.parentElement as HTMLElement;
+    fireEvent.mouseEnter(root);
+    expect(actions.style.opacity).toBe('1');
+    fireEvent.mouseLeave(root);
+    expect(actions.style.opacity).toBe('0');
+  });
+
+  it('opens the gallery when the header is double-clicked', async () => {
+    stubMatchMedia({});
+    render(<WavedromBlock code={VALID_WAVEJSON} enablePanZoom />);
+    await screen.findByTestId('wavedrom-diagram');
+    fireEvent.doubleClick(screen.getByTestId('wavedrom-header'));
+    await vi.waitFor(() => expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument());
+  });
+
+  it('does not open the gallery when a toggle or button is double-clicked', async () => {
+    stubMatchMedia({});
+    render(<WavedromBlock code={VALID_WAVEJSON} enablePanZoom />);
+    await screen.findByTestId('wavedrom-diagram');
+    fireEvent.doubleClick(screen.getByTestId('wavedrom-toggle-preview'));
+    fireEvent.doubleClick(screen.getByTestId('wavedrom-copy'));
     expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
   });
 });

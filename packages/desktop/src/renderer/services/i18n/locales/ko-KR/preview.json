@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "핀치로 확대 • 드래그로 이동 • 스와이프로 전환",
-  "diagramGalleryHelp": "도움말"
+  "diagramGalleryHelp": "도움말",
+  "diagramGalleryOpenHint": "제목 표시줄을 두 번 클릭하여 갤러리에서 보기"
 }

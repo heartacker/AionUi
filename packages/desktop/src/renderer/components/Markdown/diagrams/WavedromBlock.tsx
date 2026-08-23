@@ -19,6 +19,7 @@ import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
+import { useToolbarHover } from './useToolbarHover';
 import { getDiagramSummary, withResponsiveSvg } from '../markdownUtils';
 
 type WavedromBlockProps = {
@@ -269,6 +270,20 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
     [svg, viewMode, code, summary, panelBackground]
   );
   const gallery = useDiagramGallery(galleryItem);
+  const { toolbarStyle, onMouseEnter, onMouseLeave, onClick, blockRef } = useToolbarHover();
+
+  // Double-clicking the header bar opens the gallery — the unified entry
+  // point (ECharts needs it because its canvas swallows pointer events).
+  // Double-clicks on the preview/source toggles or the action buttons are
+  // excluded: a toggle dblclick would fire two mousedowns (a net-zero view
+  // switch) yet still open the overlay.
+  const handleHeaderDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const interactive = target.closest?.('button, [data-testid]');
+    if (interactive && interactive !== event.currentTarget) return;
+    if (!svg || viewMode !== 'preview') return;
+    gallery.openGallery(String(idRef.current));
+  };
 
   const zoomBy = (delta: number) =>
     setTransform((prev) => ({
@@ -329,7 +344,13 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
   };
 
   return (
-    <div style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}>
+    <div
+      ref={blockRef}
+      style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onClick={onClick}
+    >
       <div
         style={{
           border: '1px solid var(--bg-3)',
@@ -338,6 +359,9 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
         }}
       >
         <div
+          data-testid='wavedrom-header'
+          title={t('preview.diagramGalleryOpenHint')}
+          onDoubleClick={handleHeaderDoubleClick}
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -348,6 +372,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
             borderTopRightRadius: '0.3rem',
             padding: '6px 10px',
             borderBottom: '1px solid var(--bg-3)',
+            ...toolbarStyle,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -364,6 +389,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
             {svg && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <div
+                  data-testid='wavedrom-toggle-preview'
                   style={{
                     cursor: 'pointer',
                     color: viewMode === 'preview' ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -382,6 +408,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
                 </div>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '12px', lineHeight: '20px' }}>/</span>
                 <div
+                  data-testid='wavedrom-toggle-source'
                   style={{
                     cursor: 'pointer',
                     color: viewMode === 'source' ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -401,7 +428,10 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div
+            data-testid='wavedrom-header-actions'
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+          >
             {enablePanZoom && svg && viewMode === 'preview' && (
               <>
                 <ZoomOut

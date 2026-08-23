@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 
@@ -65,6 +65,27 @@ vi.mock('@icon-park/react', () => ({
 }));
 
 import MermaidBlock from '@/renderer/components/Markdown/diagrams/MermaidBlock';
+
+const stubMatchMedia = (queries: Record<string, boolean>) => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn((query) => ({
+      matches: queries[query] ?? false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  });
+};
+const originalMatchMedia = window.matchMedia;
+afterEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: originalMatchMedia,
+  });
+});
 
 // jsdom lacks the pointer capture API used by the drag handlers.
 beforeAll(() => {
@@ -167,5 +188,34 @@ describe('MermaidBlock pan/zoom', () => {
     const inner = diagram.firstElementChild as HTMLElement;
     expect(inner.style.transform).toContain('translate(50px, 30px)');
     expect(screen.queryByTestId('mermaid-zoom-overlay')).toBeNull();
+  });
+  it('hides the header actions until the block is hovered', async () => {
+    stubMatchMedia({});
+    render(<MermaidBlock code={'graph TD; A-->B'} enablePanZoom />);
+    await screen.findByTestId('mermaid-diagram');
+    const actions = screen.getByTestId('mermaid-header');
+    expect(actions.style.opacity).toBe('0');
+    const root = screen.getByTestId('mermaid-header').parentElement?.parentElement as HTMLElement;
+    fireEvent.mouseEnter(root);
+    expect(actions.style.opacity).toBe('1');
+    fireEvent.mouseLeave(root);
+    expect(actions.style.opacity).toBe('0');
+  });
+
+  it('opens the gallery when the header is double-clicked', async () => {
+    stubMatchMedia({});
+    render(<MermaidBlock code={'graph TD; A-->B'} enablePanZoom />);
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.doubleClick(screen.getByTestId('mermaid-header'));
+    await vi.waitFor(() => expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument());
+  });
+
+  it('does not open the gallery when a toggle or button is double-clicked', async () => {
+    stubMatchMedia({});
+    render(<MermaidBlock code={'graph TD; A-->B'} enablePanZoom />);
+    await screen.findByTestId('mermaid-diagram');
+    fireEvent.doubleClick(screen.getByTestId('mermaid-toggle-preview'));
+    fireEvent.doubleClick(screen.getByTestId('mermaid-copy'));
+    expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
   });
 });

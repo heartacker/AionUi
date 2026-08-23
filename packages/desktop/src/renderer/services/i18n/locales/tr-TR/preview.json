@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "Sıkıştırarak yakınlaştırın • Sürükleyerek taşıyın • Kaydırarak geçiş yapın",
-  "diagramGalleryHelp": "Yardım"
+  "diagramGalleryHelp": "Yardım",
+  "diagramGalleryOpenHint": "Galeride açmak için başlık çubuğuna çift tıklayın"
 }

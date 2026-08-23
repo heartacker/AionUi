@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "Pellizcar para ampliar • Arrastrar para mover • Deslizar para cambiar",
-  "diagramGalleryHelp": "Ayuda"
+  "diagramGalleryHelp": "Ayuda",
+  "diagramGalleryOpenHint": "Haz doble clic en la barra de título para abrir en la galería"
 }

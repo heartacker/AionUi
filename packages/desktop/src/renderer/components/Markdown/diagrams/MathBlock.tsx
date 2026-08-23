@@ -16,6 +16,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useTranslation } from 'react-i18next';
 import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
+import { useToolbarHover } from './useToolbarHover';
 import { buildMathSvg, MATH_SVG_PADDING } from './mathExport';
 
 type MathBlockProps = {
@@ -223,13 +224,33 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
     [svg, html, viewMode, code, summary]
   );
   const gallery = useDiagramGallery(galleryItem);
+  const { toolbarStyle, onMouseEnter, onMouseLeave, onClick, blockRef } = useToolbarHover();
   const previewTitle =
     summary && summary.length > 0
       ? `${t('preview.mathTitle')}: ${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}`
       : t('preview.mathTitle');
 
+  // Double-clicking the header bar opens the gallery — the unified entry
+  // point (ECharts needs it because its canvas swallows pointer events).
+  // Double-clicks on the preview/source toggles or the action buttons are
+  // excluded: a toggle dblclick would fire two mousedowns (a net-zero view
+  // switch) yet still open the overlay.
+  const handleHeaderDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const interactive = target.closest?.('button, [data-testid]');
+    if (interactive && interactive !== event.currentTarget) return;
+    if (!svg || viewMode !== 'preview') return;
+    gallery.openGallery(blockIdRef.current);
+  };
+
   return (
-    <div style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}>
+    <div
+      ref={blockRef}
+      style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onClick={onClick}
+    >
       <div
         style={{
           border: '1px solid var(--bg-3)',
@@ -239,6 +260,9 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
         }}
       >
         <div
+          data-testid='math-header'
+          title={t('preview.diagramGalleryOpenHint')}
+          onDoubleClick={handleHeaderDoubleClick}
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -249,6 +273,7 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
             borderTopRightRadius: '0.3rem',
             padding: '6px 10px',
             borderBottom: '1px solid var(--bg-3)',
+            ...toolbarStyle,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -304,7 +329,10 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div
+            data-testid='math-header-actions'
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
+          >
             {enablePanZoom && html && viewMode === 'preview' && (
               <>
                 <ZoomOut

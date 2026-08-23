@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "برای بزرگنمایی دو انگشت را باز کنید • برای جابه‌جایی بکشید • برای تعویض سوایپ کنید",
-  "diagramGalleryHelp": "راهنما"
+  "diagramGalleryHelp": "راهنما",
+  "diagramGalleryOpenHint": "برای باز کردن در گالری، روی نوار عنوان دوبار کلیک کنید"
 }

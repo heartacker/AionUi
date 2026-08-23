@@ -125,6 +125,9 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
 export function useDiagramGallery(item: DiagramItem | null) {
   const context = useContext(DiagramGalleryContext);
   const [localOpenId, setLocalOpenId] = useState<string | null>(null);
+  // Fallback-mode item for blocks that have nothing to register upfront and
+  // hand in the item at open time (lazy snapshots, e.g. ECharts canvas).
+  const [localItem, setLocalItem] = useState<DiagramItem | null>(null);
   const registerDiagram = context?.registerDiagram;
   const unregisterDiagram = context?.unregisterDiagram;
 
@@ -153,12 +156,29 @@ export function useDiagramGallery(item: DiagramItem | null) {
       : (id: string) => {
           setLocalOpenId(id);
         };
+    /**
+     * Register-and-open in one step for lazy items (ECharts snapshots): the
+     * provider registers the item then highlights it; without a provider the
+     * item is kept locally so the block can render the fallback overlay with it.
+     */
+    const openGalleryWithItem = (newItem: DiagramItem) => {
+      if (context) {
+        context.registerDiagram(newItem);
+        context.openGallery(newItem.id);
+      } else {
+        setLocalItem(newItem);
+        setLocalOpenId(newItem.id);
+      }
+    };
     return {
       /** True when this block's local fallback overlay is open (no provider). */
-      localOpen: localOpenId != null && localOpenId === (item?.id ?? ''),
+      localOpen: localOpenId != null && localOpenId === (localItem?.id ?? item?.id ?? ''),
       openGallery,
+      openGalleryWithItem,
+      /** Fallback-mode item handed in via openGalleryWithItem (no provider). */
+      localItem,
       /** Direct setter for the local fallback overlay. */
       setLocalOpenId,
     };
-  }, [context, item, localOpenId]);
+  }, [context, item, localOpenId, localItem]);
 }

@@ -189,5 +189,6 @@
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
   "diagramGalleryHintTouch": "Zum Zoomen zusammenziehen • Ziehen zum Verschieben • Wischen zum Wechseln",
-  "diagramGalleryHelp": "Hilfe"
+  "diagramGalleryHelp": "Hilfe",
+  "diagramGalleryOpenHint": "Doppelklicken Sie auf die Titelleiste, um die Galerie zu öffnen"
 }
