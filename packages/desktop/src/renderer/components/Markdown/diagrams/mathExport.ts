@@ -35,15 +35,28 @@ const resetDisplayMargin = (html: string): string => {
  * Wrap a KaTeX display-mode HTML string into an SVG with an explicit viewBox
  * so the gallery overlay and the export pipeline can size it by its own
  * natural dimensions, exactly like Mermaid/WaveDrom SVGs.
+ *
+ * `fontSize` pins the base font size the formula was measured at: KaTeX sizes
+ * itself with em units (`1.21em`) relative to its parent, so rendering the
+ * foreignObject in a context with a different font size (the gallery overlay
+ * inherits document.body while the chat uses --chat-font-size) would resize
+ * the formula past the measured viewBox and clip it.
  */
-export const buildMathSvg = (katexHtml: string, width: number, height: number, color: string): string => {
+export const buildMathSvg = (
+  katexHtml: string,
+  width: number,
+  height: number,
+  color: string,
+  fontSize?: string
+): string => {
   const w = Math.max(1, Math.ceil(width));
   const h = Math.max(1, Math.ceil(height));
+  const fontRule = fontSize ? `font-size:${fontSize};` : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
     `<foreignObject x="0" y="0" width="${w}" height="${h}">` +
     `<div xmlns="http://www.w3.org/1999/xhtml" ` +
-    `style="color:${color};width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center">` +
+    `style="color:${color};${fontRule}width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center">` +
     resetDisplayMargin(katexHtml) +
     `</div></foreignObject></svg>`
   );

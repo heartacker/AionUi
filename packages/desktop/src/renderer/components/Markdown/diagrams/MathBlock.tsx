@@ -128,7 +128,14 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
       const rect = katexEl.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return;
       const color = getComputedStyle(katexEl).color || 'rgb(29, 33, 41)';
-      setSvg(buildMathSvg(html, rect.width + MATH_SVG_PADDING * 2, rect.height + MATH_SVG_PADDING * 2, color));
+      // Pin the base font size into the SVG: the gallery overlay and the
+      // export pipeline render in a different font context than the chat, and
+      // KaTeX's em-based sizing would otherwise drift past the measured
+      // viewBox and clip the formula.
+      const baseFontSize = getComputedStyle(katexEl.parentElement ?? katexEl).fontSize;
+      setSvg(
+        buildMathSvg(html, rect.width + MATH_SVG_PADDING * 2, rect.height + MATH_SVG_PADDING * 2, color, baseFontSize)
+      );
     };
     measureAndBuild();
     let cancelled = false;
