@@ -133,9 +133,12 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
       // KaTeX's em-based sizing would otherwise drift past the measured
       // viewBox and clip the formula.
       const baseFontSize = getComputedStyle(katexEl.parentElement ?? katexEl).fontSize;
-      setSvg(
-        buildMathSvg(html, rect.width + MATH_SVG_PADDING * 2, rect.height + MATH_SVG_PADDING * 2, color, baseFontSize)
-      );
+      // Glyph overhangs (italic f, integrals, radical tips) paint outside the
+      // measured layout box and grow with the font — add proportional headroom
+      // on top of the fixed padding so wide fonts never clip at the viewBox.
+      const width = Math.ceil(rect.width * 1.12) + MATH_SVG_PADDING * 2;
+      const height = Math.ceil(rect.height * 1.12) + MATH_SVG_PADDING * 2;
+      setSvg(buildMathSvg(html, width, height, color, baseFontSize));
     };
     measureAndBuild();
     let cancelled = false;
@@ -143,7 +146,12 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
     window.addEventListener('resize', onResize);
     if (document.fonts?.ready) {
       void document.fonts.ready.then(() => {
-        if (!cancelled) measureAndBuild();
+        if (cancelled) return;
+        // Font swap changes glyph metrics; let the layout settle for a frame
+        // before re-measuring so the viewBox tracks the final font.
+        requestAnimationFrame(() => {
+          if (!cancelled) measureAndBuild();
+        });
       });
     }
     return () => {
