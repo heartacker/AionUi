@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import EchartsBlock from '@/renderer/components/Markdown/diagrams/EchartsBlock';
@@ -11,6 +11,8 @@ const mockResize = vi.fn();
 const mockGetDataURL = vi.fn();
 const mockGetWidth = vi.fn();
 const mockGetHeight = vi.fn();
+const mockOn = vi.fn();
+const mockOff = vi.fn();
 
 vi.mock('echarts', () => ({
   init: (...args: unknown[]) => {
@@ -22,6 +24,8 @@ vi.mock('echarts', () => ({
       getDataURL: mockGetDataURL,
       getWidth: mockGetWidth,
       getHeight: mockGetHeight,
+      on: mockOn,
+      off: mockOff,
     };
   },
 }));
@@ -267,5 +271,20 @@ describe('EchartsBlock Component', () => {
     // The snapshot is wrapped as an SVG with 2x pixel dimensions.
     expect(content.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 672 672');
     expect(content.innerHTML).toContain('data:image/png;base64,AAAA');
+  });
+
+  it('snapshots the chart eagerly once the render settles', () => {
+    vi.useFakeTimers();
+    stubMatchMedia({});
+    render(<EchartsBlock code={validChartCode} isDark={false} />);
+
+    // The block listens for the 'finished' render event and debounces the
+    // snapshot by 400ms.
+    expect(mockOn).toHaveBeenCalledWith('finished', expect.any(Function));
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(mockGetDataURL).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

@@ -46,12 +46,12 @@ function EchartsBlock({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const blockIdRef = useRef(`echarts-${Math.random().toString(36).slice(2, 10)}`);
-  // Lazy gallery snapshot: built on the first header double-click and reused
-  // afterwards (re-snapshotted when the source changes). ECharts renders to a
-  // canvas whose own interactions swallow clicks, so the header double-click
-  // is the entry point into the gallery for charts.
-  const [chartSnapshot, setChartSnapshot] = useState<DiagramItem | null>(null);
-  const gallery = useDiagramGallery(null);
+  // Eager gallery registration: once the chart finishes rendering the canvas
+  // is snapshotted and registered as an SVG-wrapped item, so every chart joins
+  // the gallery stream (thumbnails included) like the SVG-based diagram types
+  // — a gallery full of charts shows all of them, not only the opened one.
+  const [snapshotSvg, setSnapshotSvg] = useState<string | null>(null);
+  const snapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toolbarStyle, onMouseEnter, onMouseLeave, onClick, blockRef } = useToolbarHover();
 
   const parsedOption = useMemo(() => parseEChartsOption(code), [code]);
@@ -74,9 +74,45 @@ function EchartsBlock({
     return summary && summary.length > 0 ? `${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}` : undefined;
   }, [code]);
 
-  // Snapshot the canvas into an SVG-wrapped PNG data URL and open it in the
-  // gallery. The wrapper reuses the gallery's viewBox-based measurement, so
-  // the chart behaves exactly like the SVG-based diagram types.
+  const galleryItem = useMemo(
+    () =>
+      snapshotSvg && viewMode === 'preview'
+        ? {
+            id: blockIdRef.current,
+            svg: snapshotSvg,
+            code,
+            type: 'chart' as const,
+            title: previewSummary,
+          }
+        : null,
+    [snapshotSvg, viewMode, code, previewSummary]
+  );
+  const gallery = useDiagramGallery(galleryItem);
+
+  // Snapshot the canvas into an SVG-wrapped PNG data URL. 'finished' fires for
+  // every interaction-frame render (tooltips, dataZoom...), so the snapshot is
+  // debounced: one snapshot per settle, not one per frame.
+  const scheduleChartSnapshot = useCallback((instance: echarts.ECharts) => {
+    if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = setTimeout(() => {
+      snapshotTimerRef.current = null;
+      if (chartInstanceRef.current !== instance) return;
+      try {
+        const width = Math.round(instance.getWidth() * 2);
+        const height = Math.round(instance.getHeight() * 2);
+        const dataUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+        if (width < 1 || height < 1 || !dataUrl) return;
+        setSnapshotSvg(buildChartSnapshotSvg(dataUrl, width, height));
+      } catch {
+        // A failed snapshot keeps the chart out of the gallery stream; the
+        // header double-click retries on demand.
+      }
+    }, 400);
+  }, []);
+
+  // Header double-click opens the gallery. The eager snapshot is normally
+  // registered by then; the on-demand branch covers the first paint and
+  // failed snapshots.
   const handleHeaderDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     const interactive = target.closest?.('button, [data-testid]');
@@ -85,8 +121,8 @@ function EchartsBlock({
     const chart = chartInstanceRef.current;
     if (!chart) return; // source view / render error: the instance is disposed
 
-    if (chartSnapshot && chartSnapshot.code === code) {
-      gallery.openGallery(chartSnapshot.id);
+    if (snapshotSvg && viewMode === 'preview') {
+      gallery.openGallery(blockIdRef.current);
       return;
     }
 
@@ -102,7 +138,7 @@ function EchartsBlock({
         type: 'chart',
         title: previewSummary,
       };
-      setChartSnapshot(item);
+      setSnapshotSvg(item.svg);
       gallery.openGalleryWithItem(item);
     } catch {
       Message.error(t('preview.diagramImageExportFailed'));
@@ -119,6 +155,10 @@ function EchartsBlock({
         chartInstanceRef.current.dispose();
         chartInstanceRef.current = null;
       }
+      if (snapshotTimerRef.current) {
+        clearTimeout(snapshotTimerRef.current);
+        snapshotTimerRef.current = null;
+      }
 
       const theme = isDark ? 'dark' : undefined;
       const instance = echarts.init(containerRef.current, theme, {
@@ -130,8 +170,12 @@ function EchartsBlock({
         ...parsedOption,
       };
 
+      // Snapshot after every settled render so the gallery item stays current
+      // (debounced inside scheduleChartSnapshot).
+      instance.on('finished', () => scheduleChartSnapshot(instance));
       instance.setOption(optionToSet, true);
       chartInstanceRef.current = instance;
+      scheduleChartSnapshot(instance);
       setRenderError(null);
     } catch (err) {
       setRenderError(err instanceof Error ? err.message : String(err));
@@ -140,7 +184,7 @@ function EchartsBlock({
         chartInstanceRef.current = null;
       }
     }
-  }, [parsedOption, isDark]);
+  }, [parsedOption, isDark, scheduleChartSnapshot]);
 
   useEffect(() => {
     if (viewMode !== 'preview' || !parsedOption) {
@@ -171,6 +215,10 @@ function EchartsBlock({
       window.removeEventListener('resize', handleResize);
       if (resizeObserver) {
         resizeObserver.disconnect();
+      }
+      if (snapshotTimerRef.current) {
+        clearTimeout(snapshotTimerRef.current);
+        snapshotTimerRef.current = null;
       }
       if (chartInstanceRef.current) {
         chartInstanceRef.current.dispose();
