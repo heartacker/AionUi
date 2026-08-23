@@ -48,9 +48,19 @@ export const useConversationActions = ({
   const [renameModalId, setRenameModalId] = useState<string | null>(null);
   const [renameLoading, setRenameLoading] = useState(false);
   const [dropdownVisibleId, setDropdownVisibleId] = useState<string | null>(null);
+  const [exportTarget, setExportTarget] = useState<TChatConversation | null>(null);
   const { id } = useParams();
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const handleExport = useCallback((conversation: TChatConversation) => {
+    setDropdownVisibleId(null);
+    setExportTarget(conversation);
+  }, []);
+
+  const handleExportClose = useCallback(() => {
+    setExportTarget(null);
+  }, []);
 
   // Close dropdown when entering batch mode
   useEffect(() => {
@@ -338,5 +348,8 @@ export const useConversationActions = ({
     archiveProjectLoading,
     handleArchiveProjectCancel,
     handleArchiveProjectConfirm,
+    exportTarget,
+    handleExport,
+    handleExportClose,
   };
 };

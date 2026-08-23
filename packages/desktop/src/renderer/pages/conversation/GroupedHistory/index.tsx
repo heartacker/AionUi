@@ -6,6 +6,7 @@
 
 import type { TChatConversation } from '@/common/config/storage';
 import AionModal from '@/renderer/components/base/AionModal';
+import ExportConversationModal from '@/renderer/components/chat/ExportConversationModal';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useCronJobsMap } from '@/renderer/pages/cron';
 import { restrictToVerticalAxis } from '@/renderer/utils/ui/dndModifiers';
@@ -126,6 +127,9 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
     archiveProjectLoading,
     handleArchiveProjectCancel,
     handleArchiveProjectConfirm,
+    exportTarget,
+    handleExport,
+    handleExportClose,
   } = useConversationActions({
     batchMode,
     onSessionClick,
@@ -182,6 +186,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
       onArchive: handleArchive,
       onTogglePin: handleTogglePin,
       onToggleManualUnread: handleToggleManualUnread,
+      onExport: handleExport,
       getJobStatus,
       resolveConversationName,
     }),
@@ -205,6 +210,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
       handleArchive,
       handleTogglePin,
       handleToggleManualUnread,
+      handleExport,
       getJobStatus,
       resolveConversationName,
     ]
@@ -380,6 +386,14 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
           })}
         </div>
       </AionModal>
+
+      <ExportConversationModal
+        visible={Boolean(exportTarget)}
+        conversation_id={exportTarget?.id}
+        conversation={exportTarget}
+        workspace={exportTarget?.extra?.workspace}
+        onCancel={handleExportClose}
+      />
 
       <div>
         {/* L1: Pinned section */}
