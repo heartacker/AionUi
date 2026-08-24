@@ -25,7 +25,7 @@ import {
 } from '@/renderer/utils/chat/conversationExport';
 import { loadAllConversationMessagesPaged } from '@/renderer/utils/chat/messagePagination';
 import { copyText } from '@/renderer/utils/ui/clipboard';
-import { Button, Checkbox, Input, Message, Radio, Spin, Tooltip, Typography } from '@arco-design/web-react';
+import { Button, Checkbox, Input, Message, Radio, Spin, Tag, Tooltip, Typography } from '@arco-design/web-react';
 import { CheckOne, Copy, DownloadOne, FileText } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -77,6 +77,7 @@ const ExportConversationModal: React.FC<ExportConversationModalProps> = ({
   useEffect(() => {
     if (!visible) return;
 
+    setScope('all');
     let isMounted = true;
     const targetId = conversation_id || propConversation?.id;
     if (!targetId) return;
@@ -332,7 +333,7 @@ const ExportConversationModal: React.FC<ExportConversationModalProps> = ({
                   {messages.map((msg, index) => {
                     const isUser = getMessageRoleKey(msg) === 'user';
                     const isChecked = selectedIds.includes(msg.id);
-                    const rawContent = readMessageContent(msg);
+                    const rawContent = readMessageContent(msg, true);
                     return (
                       <div
                         key={msg.id}
@@ -344,15 +345,9 @@ const ExportConversationModal: React.FC<ExportConversationModalProps> = ({
                         <Checkbox checked={isChecked} className='mt-2px' />
                         <div className='flex-1 min-w-0'>
                           <div className='flex items-center justify-between gap-8px mb-2px'>
-                            <span
-                              className={`text-11px font-600 px-6px py-1px rounded ${
-                                isUser
-                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                                  : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                              }`}
-                            >
+                            <Tag size='small' color={isUser ? 'arcoblue' : 'green'} className='font-600'>
                               {isUser ? userNickname || 'User' : aiNickname || assistantName || 'AI'}
-                            </span>
+                            </Tag>
                             {msg.created_at && (
                               <span className='text-10px text-t-tertiary'>{formatDisplayDateTime(msg.created_at)}</span>
                             )}
