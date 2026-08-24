@@ -6,6 +6,7 @@
 
 import type { TMessage } from '@/common/chat/chatLib';
 import type { TChatConversation } from '@/common/config/storage';
+import { hasThinkTags, stripThinkTags } from '@/renderer/utils/chat/thinkTagFilter';
 
 const INVALID_FILENAME_CHARS_RE = /[<>:"/\\|?*]/g;
 const padTimestampPart = (value: number): string => String(value).padStart(2, '0');
@@ -50,20 +51,25 @@ export const formatDisplayDateTime = (time = Date.now()): string => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
+export const sanitizeExportContent = (rawText: string): string => {
+  if (!rawText) return '';
+  return hasThinkTags(rawText) ? stripThinkTags(rawText).trim() : rawText.trim();
+};
+
 const formatDefaultExportFileDate = (time = Date.now()): string => {
   const date = new Date(time);
   return `${date.getFullYear()}-${padTimestampPart(date.getMonth() + 1)}-${padTimestampPart(date.getDate())}`;
 };
 
-export const readMessageContent = (message: TMessage): string => {
+export const readMessageContent = (message: TMessage, sanitize = false): string => {
   const content = message.content as Record<string, unknown> | string | undefined;
 
   if (typeof content === 'string') {
-    return content;
+    return sanitize ? sanitizeExportContent(content) : content;
   }
 
   if (content && typeof content === 'object' && typeof content.content === 'string') {
-    return content.content;
+    return sanitize ? sanitizeExportContent(content.content) : content.content;
   }
 
   try {
@@ -101,7 +107,7 @@ export const isDialogueMessage = (message: TMessage): boolean => {
     return false;
   }
 
-  const text = readMessageContent(message).trim();
+  const text = readMessageContent(message, true);
   return text.length > 0;
 };
 
@@ -186,7 +192,7 @@ export const buildConversationMarkdownExport = (
     const timeInfo = includeTimestamp && msg.created_at ? ` (${formatDisplayDateTime(msg.created_at)})` : '';
     lines.push(`## ${roleName}${timeInfo}`);
     lines.push('');
-    lines.push(readMessageContent(msg).trim());
+    lines.push(readMessageContent(msg, true));
     lines.push('');
   });
 
@@ -219,7 +225,7 @@ export const buildConversationPlainTextExport = (
     const roleName = getRoleDisplayName(msg, userNickname, aiNickname);
     const timeInfo = includeTimestamp && msg.created_at ? ` [${formatDisplayDateTime(msg.created_at)}]` : '';
     lines.push(`${roleName}${timeInfo}:`);
-    lines.push(readMessageContent(msg).trim());
+    lines.push(readMessageContent(msg, true));
     lines.push('');
     lines.push('----------------------------------------');
     lines.push('');
@@ -253,7 +259,7 @@ export const buildConversationJsonExport = (
         id: msg.id,
         role: getMessageRoleKey(msg),
         senderName: getRoleDisplayName(msg, userNickname, aiNickname),
-        content: readMessageContent(msg),
+        content: readMessageContent(msg, true),
         createdAt: msg.created_at ? new Date(msg.created_at).toISOString() : undefined,
       })),
     },

@@ -15,6 +15,7 @@ import {
   filterExportMessages,
   isDialogueMessage,
   normalizeExportFileName,
+  sanitizeExportContent,
 } from '@/renderer/utils/chat/conversationExport';
 
 const createTestConversation = (name = 'Test Session'): TChatConversation =>
@@ -69,9 +70,16 @@ describe('conversationExport utilities', () => {
       expect(isDialogueMessage(toolMsg('t1'))).toBe(false);
       expect(isDialogueMessage(errorMsg('e1'))).toBe(false);
       expect(isDialogueMessage(userMsg('empty', '   '))).toBe(false);
+      expect(isDialogueMessage(aiMsg('think-only', '<think>reasoning process</think>'))).toBe(false);
     });
   });
 
+  describe('sanitizeExportContent & think tag stripping', () => {
+    it('strips think tags from message content during export', () => {
+      const raw = '<think>some private thought</think>Here is the answer.';
+      expect(sanitizeExportContent(raw)).toBe('Here is the answer.');
+    });
+  });
   describe('filterExportMessages', () => {
     const messages = [
       userMsg('u1', 'Question 1'),
