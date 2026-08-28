@@ -82,6 +82,40 @@ const toFixedSizeSvg = (svg: string, scale: number): string => {
 const buildSvgBlob = (svg: string): Blob => new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
 
 /**
+ * Convert any HTML inside <foreignObject> into pure SVG <text> elements
+ * so rasterization never taints the canvas in browser contexts.
+ */
+export const sanitizeSvgForRasterization = (svg: string): string => {
+  if (!svg || !svg.includes('foreignObject')) return svg;
+
+  return svg.replace(
+    /<foreignObject\b([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
+    (_match, attrs: string, content: string) => {
+      const xMatch = /\bx\s*=\s*["']([\d.]+)["']/i.exec(attrs);
+      const yMatch = /\by\s*=\s*["']([\d.]+)["']/i.exec(attrs);
+      const wMatch = /\bwidth\s*=\s*["']([\d.]+)["']/i.exec(attrs);
+      const hMatch = /\bheight\s*=\s*["']([\d.]+)["']/i.exec(attrs);
+
+      const x = xMatch ? parseFloat(xMatch[1]) : 0;
+      const y = yMatch ? parseFloat(yMatch[1]) : 0;
+      const w = wMatch ? parseFloat(wMatch[1]) : 0;
+      const h = hMatch ? parseFloat(hMatch[1]) : 0;
+
+      const centerX = x + w / 2;
+      const centerY = y + h / 2;
+
+      const text = content
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!text) return '';
+
+      return `<text x="${centerX}" y="${centerY}" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-family="sans-serif" font-size="14">${text}</text>`;
+    }
+  );
+};
+
+/**
  * Rasterize a diagram SVG into a PNG blob. Paints a white backdrop first so
  * exports match the light diagram card (Mermaid/WaveDrom SVGs are transparent).
  */
@@ -93,11 +127,12 @@ export const svgToPngBlob = (svg: string): Promise<Blob> =>
       return;
     }
 
-    const cleanSvg = ensureSvgNamespaces(svg);
+    const cleanSvg = sanitizeSvgForRasterization(ensureSvgNamespaces(svg));
     const sizedSvg = toFixedSizeSvg(cleanSvg, PNG_SCALE);
     const blob = buildSvgBlob(sizedSvg);
     const url = URL.createObjectURL(blob);
     const image = new Image();
+    image.crossOrigin = 'anonymous';
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       if (!settled) {
@@ -242,21 +277,24 @@ export const copyPngViaExecCommand = async (pngBlob: Blob): Promise<void> => {
  */
 export const copySvgImage = async (svg: string): Promise<void> => {
   const cleanSvg = ensureSvgNamespaces(svg);
-  const pngBlob = await svgToPngBlob(cleanSvg).catch((): null => null);
+  let pngBlob: Blob | null = null;
+  try {
+    pngBlob = await svgToPngBlob(cleanSvg);
+  } catch (err) {
+    console.warn('[copySvgImage] svgToPngBlob failed:', err);
+  }
 
   // 1. Try modern Async Clipboard API in secure contexts (localhost, https, Electron)
-  if (navigator.clipboard && window.isSecureContext && typeof ClipboardItem !== 'undefined') {
-    if (pngBlob) {
-      try {
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            'image/png': pngBlob,
-          }),
-        ]);
-        return;
-      } catch (err) {
-        console.warn('[copySvgImage] Async clipboard write failed, trying fallback:', err);
-      }
+  if (pngBlob && navigator.clipboard && window.isSecureContext && typeof ClipboardItem !== 'undefined') {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': pngBlob,
+        }),
+      ]);
+      return;
+    } catch (err) {
+      console.warn('[copySvgImage] Async clipboard write failed, trying fallback:', err);
     }
   }
 
@@ -278,29 +316,15 @@ export const copySvgImage = async (svg: string): Promise<void> => {
 /**
  * Trigger a browser download for the diagram. SVG is written verbatim (vector);
  * PNG goes through the rasterizer (or direct raster blob for chart snapshots).
- * If PNG rasterization fails in restricted browser contexts, falls back to SVG download.
  */
 export const saveDiagramImage = async (svg: string, filename: string, format: DiagramExportFormat): Promise<void> => {
   const cleanSvg = ensureSvgNamespaces(svg);
-  let blob: Blob;
-  let finalFilename = filename;
-
-  if (format === 'svg') {
-    blob = buildSvgBlob(cleanSvg);
-  } else {
-    try {
-      blob = await svgToPngBlob(cleanSvg);
-    } catch (err) {
-      console.warn('[saveDiagramImage] PNG rasterization failed, falling back to SVG:', err);
-      blob = buildSvgBlob(cleanSvg);
-      finalFilename = filename.replace(/\.png$/i, '.svg');
-    }
-  }
+  const blob = format === 'svg' ? buildSvgBlob(cleanSvg) : await svgToPngBlob(cleanSvg);
 
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = finalFilename;
+  anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
