@@ -6,6 +6,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  cleanSvgForXml,
   copyPngViaExecCommand,
   copySvgImage,
   ensureSvgNamespaces,
@@ -143,6 +144,22 @@ describe('copySvgImage', () => {
     const svg = `<svg viewBox="0 0 10 10"><image href="data:image/png;base64,${pngBase64}" width="10" height="10"/></svg>`;
     await expect(copySvgImage(svg)).resolves.toBeUndefined();
     expect(document.execCommand).toHaveBeenCalledWith('copy');
+  });
+});
+
+describe('cleanSvgForXml', () => {
+  it('closes unclosed <br>, <hr>, <img> tags into valid XML', () => {
+    const raw = '<svg><p>Line1<br>Line2<hr><img src="test.png"></p></svg>';
+    const result = cleanSvgForXml(raw);
+    expect(result).toContain('<br/>');
+    expect(result).toContain('<hr/>');
+    expect(result).toContain('<img src="test.png"/>');
+  });
+
+  it('replaces &nbsp; with &#160;', () => {
+    const raw = '<svg><text>A&nbsp;B</text></svg>';
+    const result = cleanSvgForXml(raw);
+    expect(result).toContain('A&#160;B');
   });
 });
 

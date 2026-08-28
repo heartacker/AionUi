@@ -7,10 +7,30 @@
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { getSvgIntrinsicSize } from '../markdownUtils';
 
-export type DiagramExportFormat = 'svg' | 'png';
+export type DiagramExportFormat = 'svg' | 'png' | 'png-transparent' | 'png-theme';
+
+export type SvgToPngOptions = {
+  background?: 'transparent' | 'theme' | string;
+  themeBackground?: string;
+  isDark?: boolean;
+};
 
 // Rasterize at 2x the natural size so exported PNGs stay crisp on HiDPI.
 const PNG_SCALE = 2;
+
+/**
+ * Fix unclosed void HTML tags (e.g. <br>, <hr>, <img>) and named entities
+ * so the SVG complies with strict XML parsers when opened standalone.
+ */
+export const cleanSvgForXml = (svg: string): string => {
+  if (!svg) return svg;
+
+  return svg
+    .replace(/<br(?:\s*|\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
+    .replace(/<hr(?:\s*|\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
+    .replace(/<img(?:\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
+    .replace(/&nbsp;/g, '&#160;');
+};
 
 /**
  * Ensure the SVG string carries the proper XML namespaces for standalone usage.
@@ -79,7 +99,8 @@ const toFixedSizeSvg = (svg: string, scale: number): string => {
   });
 };
 
-const buildSvgBlob = (svg: string): Blob => new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+export const buildSvgBlob = (svg: string): Blob =>
+  new Blob([cleanSvgForXml(ensureSvgNamespaces(svg))], { type: 'image/svg+xml;charset=utf-8' });
 
 /**
  * Convert any HTML inside <foreignObject> into pure SVG <text> elements
@@ -116,10 +137,9 @@ export const sanitizeSvgForRasterization = (svg: string): string => {
 };
 
 /**
- * Rasterize a diagram SVG into a PNG blob. Paints a white backdrop first so
- * exports match the light diagram card (Mermaid/WaveDrom SVGs are transparent).
+ * Rasterize a diagram SVG into a PNG blob. Supports transparent background or theme-matched background.
  */
-export const svgToPngBlob = (svg: string): Promise<Blob> =>
+export const svgToPngBlob = (svg: string, options?: SvgToPngOptions): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const embeddedBlob = extractEmbeddedRasterBlob(svg);
     if (embeddedBlob) {
@@ -127,7 +147,7 @@ export const svgToPngBlob = (svg: string): Promise<Blob> =>
       return;
     }
 
-    const cleanSvg = sanitizeSvgForRasterization(ensureSvgNamespaces(svg));
+    const cleanSvg = sanitizeSvgForRasterization(cleanSvgForXml(ensureSvgNamespaces(svg)));
     const sizedSvg = toFixedSizeSvg(cleanSvg, PNG_SCALE);
     const blob = buildSvgBlob(sizedSvg);
     const url = URL.createObjectURL(blob);
@@ -140,7 +160,7 @@ export const svgToPngBlob = (svg: string): Promise<Blob> =>
         cleanup();
         reject(new Error('image rasterization timed out'));
       }
-    }, 2000);
+    }, 2500);
 
     const cleanup = () => {
       if (timer) {
@@ -150,31 +170,45 @@ export const svgToPngBlob = (svg: string): Promise<Blob> =>
       URL.revokeObjectURL(url);
     };
 
-    const handleLoad = () => {
+    const renderToCanvas = (img: HTMLImageElement): Promise<Blob> => {
+      const width = img.naturalWidth || 1;
+      const height = img.naturalHeight || 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        throw new Error('canvas 2d context unavailable');
+      }
+
+      if (options?.background !== 'transparent') {
+        const bg =
+          (options?.background && options.background !== 'theme' ? options.background : null) ||
+          options?.themeBackground ||
+          (options?.isDark ? '#1d2129' : '#ffffff');
+        context.fillStyle = bg;
+        context.fillRect(0, 0, width, height);
+      }
+
+      context.drawImage(img, 0, 0, width, height);
+      return new Promise<Blob>((res, rej) => {
+        canvas.toBlob((result) => {
+          if (result) {
+            res(result);
+          } else {
+            rej(new Error('canvas toBlob failed'));
+          }
+        }, 'image/png');
+      });
+    };
+
+    const handleLoad = async () => {
       if (settled) return;
       settled = true;
       try {
-        const width = image.naturalWidth || 1;
-        const height = image.naturalHeight || 1;
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext('2d');
+        const result = await renderToCanvas(image);
         cleanup();
-        if (!context) {
-          reject(new Error('canvas 2d context unavailable'));
-          return;
-        }
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, width, height);
-        context.drawImage(image, 0, 0, width, height);
-        canvas.toBlob((result) => {
-          if (result) {
-            resolve(result);
-          } else {
-            reject(new Error('canvas toBlob failed'));
-          }
-        }, 'image/png');
+        resolve(result);
       } catch (err) {
         cleanup();
         reject(err);
@@ -184,28 +218,14 @@ export const svgToPngBlob = (svg: string): Promise<Blob> =>
     const tryDataUrlFallback = () => {
       try {
         const fallbackImage = new Image();
+        fallbackImage.crossOrigin = 'anonymous';
         const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sizedSvg)}`;
-        fallbackImage.addEventListener('load', () => {
+        fallbackImage.addEventListener('load', async () => {
           if (settled) return;
           settled = true;
           try {
-            const width = fallbackImage.naturalWidth || 1;
-            const height = fallbackImage.naturalHeight || 1;
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const context = canvas.getContext('2d');
-            if (!context) {
-              reject(new Error('canvas 2d context unavailable'));
-              return;
-            }
-            context.fillStyle = '#ffffff';
-            context.fillRect(0, 0, width, height);
-            context.drawImage(fallbackImage, 0, 0, width, height);
-            canvas.toBlob(
-              (result) => (result ? resolve(result) : reject(new Error('canvas toBlob failed'))),
-              'image/png'
-            );
+            const result = await renderToCanvas(fallbackImage);
+            resolve(result);
           } catch (err) {
             reject(err);
           }
@@ -275,11 +295,11 @@ export const copyPngViaExecCommand = async (pngBlob: Blob): Promise<void> => {
  * falls back to legacy execCommand image copy, and finally falls back to copying the clean SVG
  * source markup via text clipboard (which is 100% reliable across non-secure WebUI over LAN).
  */
-export const copySvgImage = async (svg: string): Promise<void> => {
-  const cleanSvg = ensureSvgNamespaces(svg);
+export const copySvgImage = async (svg: string, options?: SvgToPngOptions): Promise<void> => {
+  const cleanSvg = cleanSvgForXml(ensureSvgNamespaces(svg));
   let pngBlob: Blob | null = null;
   try {
-    pngBlob = await svgToPngBlob(cleanSvg);
+    pngBlob = await svgToPngBlob(cleanSvg, options);
   } catch (err) {
     console.warn('[copySvgImage] svgToPngBlob failed:', err);
   }
@@ -317,9 +337,23 @@ export const copySvgImage = async (svg: string): Promise<void> => {
  * Trigger a browser download for the diagram. SVG is written verbatim (vector);
  * PNG goes through the rasterizer (or direct raster blob for chart snapshots).
  */
-export const saveDiagramImage = async (svg: string, filename: string, format: DiagramExportFormat): Promise<void> => {
-  const cleanSvg = ensureSvgNamespaces(svg);
-  const blob = format === 'svg' ? buildSvgBlob(cleanSvg) : await svgToPngBlob(cleanSvg);
+export const saveDiagramImage = async (
+  svg: string,
+  filename: string,
+  format: DiagramExportFormat,
+  options?: SvgToPngOptions
+): Promise<void> => {
+  const cleanSvg = cleanSvgForXml(ensureSvgNamespaces(svg));
+  let blob: Blob;
+
+  if (format === 'svg') {
+    blob = buildSvgBlob(cleanSvg);
+  } else if (format === 'png-transparent') {
+    blob = await svgToPngBlob(cleanSvg, { ...options, background: 'transparent' });
+  } else {
+    // format is 'png-theme' or 'png'
+    blob = await svgToPngBlob(cleanSvg, options);
+  }
 
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

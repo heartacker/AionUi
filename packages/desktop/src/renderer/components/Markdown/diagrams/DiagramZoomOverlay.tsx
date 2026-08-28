@@ -467,12 +467,25 @@ function DiagramZoomOverlay({
       });
   };
 
+  const isDarkTheme =
+    document.documentElement.getAttribute('data-theme') === 'dark' ||
+    cardBackground === '#1d2129' ||
+    cardBackground === '#17171a';
+
+  const exportOptions = useMemo(
+    () => ({
+      themeBackground: cardBackground,
+      isDark: isDarkTheme,
+    }),
+    [cardBackground, isDarkTheme]
+  );
+
   const handleCopyImage = () => {
     if (!exportSvg) return;
     // Math SVGs are foreignObject wrappers around KaTeX HTML and rely on the
     // page stylesheet + theme color; make them standalone before exporting.
     const run = (readySvg: string) =>
-      copySvgImage(readySvg)
+      copySvgImage(readySvg, exportOptions)
         .then(() => {
           Message.success(t('common.copySuccess'));
         })
@@ -498,7 +511,7 @@ function DiagramZoomOverlay({
     if (!exportSvg) return;
     const extension = format === 'svg' ? 'svg' : 'png';
     const run = (readySvg: string) =>
-      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format)
+      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format, exportOptions)
         .then(() => {
           Message.success(t('conversation.history.exportSuccess'));
         })
@@ -751,9 +764,33 @@ function DiagramZoomOverlay({
                   background: 'var(--bg-2)',
                   border: '1px solid var(--bg-3)',
                   borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                  minWidth: '130px',
+                  whiteSpace: 'nowrap',
                 }}
               >
+                <button
+                  type='button'
+                  data-testid='diagram-overlay-save-png-transparent'
+                  style={saveMenuItemStyle}
+                  onClick={() => {
+                    setSaveMenuOpen(false);
+                    handleSaveImage('png-transparent');
+                  }}
+                >
+                  {t('preview.diagramFormatPngTransparent')}
+                </button>
+                <button
+                  type='button'
+                  data-testid='diagram-overlay-save-png'
+                  data-theme-save='true'
+                  style={saveMenuItemStyle}
+                  onClick={() => {
+                    setSaveMenuOpen(false);
+                    handleSaveImage('png-theme');
+                  }}
+                >
+                  {t('preview.diagramFormatPngTheme')}
+                </button>
                 <button
                   type='button'
                   data-testid='diagram-overlay-save-svg'
@@ -764,17 +801,6 @@ function DiagramZoomOverlay({
                   }}
                 >
                   {t('preview.diagramFormatSvg')}
-                </button>
-                <button
-                  type='button'
-                  data-testid='diagram-overlay-save-png'
-                  style={saveMenuItemStyle}
-                  onClick={() => {
-                    setSaveMenuOpen(false);
-                    handleSaveImage('png');
-                  }}
-                >
-                  {t('preview.diagramFormatPng')}
                 </button>
               </div>
             )}

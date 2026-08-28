@@ -188,7 +188,9 @@
   "diagramImageExportFailed": "画像の書き出しに失敗しました",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
-  "diagramGalleryHintTouch": "ピンチでズーム • ドラッグで移動 • スワイプで切り替え",
+  "diagramFormatPngTransparent": "PNG（透明背景）",
+  "diagramFormatPngTheme": "PNG（テーマ背景）",
+  "diagramGalleryHintTouch": "ピンチでズーム • ドラッグでパン • スワイプで図を切り替え",
   "diagramGalleryHelp": "ヘルプ",
   "diagramGalleryOpenHint": "タイトルバーをダブルクリックしてギャラリーで表示"
 }
