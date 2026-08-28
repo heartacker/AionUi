@@ -468,6 +468,7 @@ function DiagramZoomOverlay({
   };
 
   const handleCopyImage = () => {
+    if (!exportSvg) return;
     // Math SVGs are foreignObject wrappers around KaTeX HTML and rely on the
     // page stylesheet + theme color; make them standalone before exporting.
     const run = (readySvg: string) =>
@@ -475,27 +476,46 @@ function DiagramZoomOverlay({
         .then(() => {
           Message.success(t('common.copySuccess'));
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          // Non-secure contexts (WebUI over plain HTTP) and sandboxed pages
+          // lack the clipboard APIs; the detail helps diagnose which gate hit.
+          console.error('[DiagramGallery] copy image failed:', error);
           Message.error(t('preview.diagramImageExportFailed'));
         });
     if (activeItem?.type !== 'math') {
       void run(exportSvg);
       return;
     }
-    void prepareMathSvgForExport(exportSvg).then(run);
+    void prepareMathSvgForExport(exportSvg)
+      .then(run)
+      .catch((error: unknown) => {
+        console.warn('[DiagramGallery] prepareMathSvgForExport fallback to raw SVG:', error);
+        void run(exportSvg);
+      });
   };
 
   const handleSaveImage = (format: DiagramExportFormat) => {
+    if (!exportSvg) return;
     const extension = format === 'svg' ? 'svg' : 'png';
     const run = (readySvg: string) =>
-      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format).catch(() => {
-        Message.error(t('preview.diagramImageExportFailed'));
-      });
+      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format)
+        .then(() => {
+          Message.success(t('conversation.history.exportSuccess'));
+        })
+        .catch((error: unknown) => {
+          console.error('[DiagramGallery] save image failed:', error);
+          Message.error(t('preview.diagramImageExportFailed'));
+        });
     if (activeItem?.type !== 'math') {
       void run(exportSvg);
       return;
     }
-    void prepareMathSvgForExport(exportSvg).then(run);
+    void prepareMathSvgForExport(exportSvg)
+      .then(run)
+      .catch((error: unknown) => {
+        console.warn('[DiagramGallery] prepareMathSvgForExport fallback to raw SVG:', error);
+        void run(exportSvg);
+      });
   };
 
   // The save button pops a small format menu (SVG preferred, PNG as fallback);
