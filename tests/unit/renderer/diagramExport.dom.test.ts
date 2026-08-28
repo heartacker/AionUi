@@ -10,6 +10,7 @@ import {
   copySvgImage,
   ensureSvgNamespaces,
   extractEmbeddedRasterBlob,
+  sanitizeSvgForRasterization,
   saveDiagramImage,
 } from '@/renderer/components/Markdown/diagrams/diagramExport';
 
@@ -69,6 +70,23 @@ describe('ensureSvgNamespaces', () => {
     const result = ensureSvgNamespaces(raw);
     expect(result).toContain('xmlns="http://www.w3.org/2000/svg"');
     expect(result).toContain('xmlns:xlink="http://www.w3.org/1999/xlink"');
+  });
+});
+
+describe('sanitizeSvgForRasterization', () => {
+  it('converts foreignObject containing HTML into pure SVG text elements', () => {
+    const raw =
+      '<svg width="200" height="100"><foreignObject x="10" y="20" width="80" height="40"><div xmlns="http://www.w3.org/1999/xhtml"><span>Hello World</span></div></foreignObject></svg>';
+    const result = sanitizeSvgForRasterization(raw);
+    expect(result).not.toContain('foreignObject');
+    expect(result).toContain('<text x="50" y="40" text-anchor="middle" dominant-baseline="central"');
+    expect(result).toContain('Hello World');
+  });
+
+  it('leaves pure SVG without foreignObject unchanged', () => {
+    const raw = '<svg width="200" height="100"><circle cx="50" cy="50" r="20"/></svg>';
+    const result = sanitizeSvgForRasterization(raw);
+    expect(result).toBe(raw);
   });
 });
 

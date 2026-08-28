@@ -46,6 +46,8 @@ const ensureMermaidInitialized = (theme: 'light' | 'dark') => {
     suppressErrorRendering: true,
     theme: theme === 'dark' ? 'dark' : 'default',
     fontFamily: 'inherit',
+    flowchart: { htmlLabels: false },
+    sequence: { useMaxWidth: true },
   });
   initializedTheme = theme;
 };
