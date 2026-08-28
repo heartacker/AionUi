@@ -57,6 +57,9 @@ export const EXTENSION_MAP: Record<string, FileTypeInfo> = {
   xlsm: { contentType: 'unsupported', editable: false, language: 'xlsm' },
   pptm: { contentType: 'unsupported', editable: false, language: 'pptm' },
   heic: { contentType: 'unsupported', editable: false, language: 'heic' },
+  // Draw.io
+  drawio: { contentType: 'drawio', editable: true, language: 'xml' },
+  dio: { contentType: 'drawio', editable: true, language: 'xml' },
   // Image
   png: { contentType: 'image', editable: false, language: 'image' },
   jpg: { contentType: 'image', editable: false, language: 'image' },
@@ -76,6 +79,10 @@ export const EXTENSION_MAP: Record<string, FileTypeInfo> = {
  * Determine preview content type and editability from file name
  */
 export const getFileTypeInfo = (file_name: string): FileTypeInfo => {
-  const ext = file_name.toLowerCase().split('.').pop() || '';
+  const lowerName = file_name.toLowerCase();
+  if (lowerName.endsWith('.drawio.xml') || lowerName.endsWith('.dio.xml')) {
+    return { contentType: 'drawio', editable: true, language: 'xml' };
+  }
+  const ext = lowerName.split('.').pop() || '';
   return EXTENSION_MAP[ext] || { contentType: 'code', editable: true, language: ext || 'text' };
 };

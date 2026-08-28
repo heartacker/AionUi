@@ -63,6 +63,9 @@ const EXTENSION_TO_ICON: Record<string, string> = {
   sql: 'database',
   diff: 'diff',
   patch: 'diff',
+  // Diagrams
+  drawio: 'xml',
+  dio: 'xml',
   // Office
   pdf: 'pdf',
   doc: 'ms-word',

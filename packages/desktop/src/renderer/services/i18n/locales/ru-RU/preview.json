@@ -197,5 +197,19 @@
   "diagramGalleryHelp": "Справка",
   "diagramGalleryOpenHint": "Двойной щелчок по заголовку — просмотр в галерее",
   "svgTitle": "SVG-изображение",
-  "imageTitle": "Предпросмотр изображения"
+  "imageTitle": "Предпросмотр изображения",
+  "drawioTitle": "Диаграмма Draw.io",
+  "drawio": {
+    "title": "Диаграмма Draw.io",
+    "loading": "Загрузка диаграммы Draw.io...",
+    "loadFailed": "Не удалось загрузить диаграмму Draw.io",
+    "timeout": "Превышено время ожидания загрузки диаграммы Draw.io",
+    "page": "Страница {{page}}",
+    "diagramView": "Просмотр диаграммы",
+    "sourceView": "XML-код",
+    "fitView": "По размеру окна",
+    "zoomIn": "Увеличить",
+    "zoomOut": "Уменьшить",
+    "openInApp": "Открыть в Diagrams.net"
+  }
 }

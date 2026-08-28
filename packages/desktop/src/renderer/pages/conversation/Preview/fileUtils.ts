@@ -39,6 +39,7 @@ export const FILE_EXTENSION_MAP: Record<PreviewContentType, readonly string[]> =
    *   saying it is unsupported.
    */
   unsupported: ['doc', 'xls', 'ppt', 'odt', 'ods', 'odp', 'docm', 'xlsm', 'pptm', 'heic'],
+  drawio: ['drawio', 'dio'],
   url: [], // url 类型用于网页预览，无扩展名映射 / url type for web preview, no extension mapping
   browser: [], // browser 类型用于应用内浏览器 tab，无扩展名映射 / browser type for in-app browser tabs, no extension mapping
 };
@@ -88,6 +89,11 @@ export const getFileExtension = (file_path: string): string => {
  * ```
  */
 export const getContentTypeByExtension = (file_path: string): PreviewContentType => {
+  const lowerPath = (file_path || '').toLowerCase();
+  if (lowerPath.endsWith('.drawio.xml') || lowerPath.endsWith('.dio.xml')) {
+    return 'drawio';
+  }
+
   const ext = getFileExtension(file_path);
   if (!ext) return 'code'; // 没有扩展名，默认为 code / No extension, default to code
 
@@ -122,7 +128,7 @@ export const isImageFile = (file_path: string): boolean => {
  */
 export const isTextFile = (file_path: string): boolean => {
   const contentType = getContentTypeByExtension(file_path);
-  return ['markdown', 'html', 'code', 'csv'].includes(contentType);
+  return ['markdown', 'html', 'code', 'csv', 'drawio'].includes(contentType);
 };
 
 /**

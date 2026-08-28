@@ -24,7 +24,8 @@ export type PreviewContentType =
   // user to install officecli — which would not have helped for any of them.
   | 'unsupported'
   | 'url'
-  | 'browser';
+  | 'browser'
+  | 'drawio';
 
 export interface RemoteImageFetchRequest {
   url: string;

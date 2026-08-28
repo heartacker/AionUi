@@ -41,6 +41,7 @@ import OfficeDocPreview from '../viewers/OfficeDocViewer';
 import PptViewer from '../viewers/PptViewer';
 import CodeEditor from '../editors/CodeEditor';
 import URLViewer from '../viewers/URLViewer';
+import DrawioViewer from '../viewers/drawio/DrawioViewer';
 import BrowserTabLayer from '../../browser/BrowserTabLayer';
 import { MAX_BROWSER_TABS } from '../../browser/constants';
 import {
@@ -639,6 +640,7 @@ const PreviewPanel: React.FC = () => {
   };
   const isMarkdown = content_type === 'markdown';
   const isHTML = content_type === 'html';
+  const isDrawio = content_type === 'drawio';
   const isEditable = metadata?.editable !== false; // 默认可编辑 / Default editable
 
   // 「在系统中打开」：有 file_path 或有 fileRef 都能打开。
@@ -1083,6 +1085,94 @@ const PreviewPanel: React.FC = () => {
       }
     }
 
+    // Draw.io 模式 / Draw.io mode
+    if (isDrawio) {
+      // 分屏模式：左右分割（XML 编辑器 + 图表预览）/ Split-screen mode: XML Editor + Diagram Preview
+      if (isSplitScreenEnabled) {
+        if (layout?.isMobile) {
+          return (
+            <div className='flex-1 overflow-hidden'>
+              <DrawioViewer
+                content={content}
+                file_path={metadata?.file_path}
+                fileRef={metadata?.fileRef}
+                workspace={metadata?.workspace}
+                isDirty={activeTab?.isDirty}
+                onContentChange={updateContent}
+              />
+            </div>
+          );
+        }
+
+        return (
+          <div className='flex flex-1 relative overflow-hidden'>
+            {/* 左侧：XML 编辑器 / Left: XML Editor */}
+            <div className='flex flex-col relative' style={{ width: `${splitRatio}%` }}>
+              <div className='h-40px flex items-center px-12px bg-bg-2'>
+                <span className='text-12px text-t-secondary'>{t('preview.code')}</span>
+              </div>
+              <div className='flex-1 overflow-hidden'>
+                <CodeEditor
+                  key={activeTabId ?? undefined}
+                  value={content}
+                  onChange={updateContent}
+                  language='xml'
+                  fileName={metadata?.file_name}
+                  readOnly={isEditable === false}
+                />
+              </div>
+              {/* 拖动分割线 / Drag handle */}
+              {createDragHandle({ className: 'absolute end-0 top-0 bottom-0' })}
+            </div>
+
+            {/* 右侧：图表预览 / Right: Diagram Preview */}
+            <div className='flex flex-col' style={{ width: `${100 - splitRatio}%`, minWidth: 0 }}>
+              <div className='h-40px flex items-center px-12px bg-bg-2'>
+                <span className='text-12px text-t-secondary'>{t('preview.preview')}</span>
+              </div>
+              <div className='flex flex-col flex-1 overflow-hidden'>
+                <DrawioViewer
+                  content={content}
+                  file_path={metadata?.file_path}
+                  fileRef={metadata?.fileRef}
+                  workspace={metadata?.workspace}
+                  isDirty={activeTab?.isDirty}
+                  onContentChange={updateContent}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // 非分屏模式：单栏（XML 或图表预览）/ Non-split mode: Single panel (XML or diagram preview)
+      if (viewMode === 'source') {
+        return (
+          <div className='flex-1 overflow-hidden'>
+            <CodeEditor
+              key={activeTabId ?? undefined}
+              value={content}
+              onChange={handleContentChange}
+              language='xml'
+              fileName={metadata?.file_name}
+              readOnly={isEditable === false}
+            />
+          </div>
+        );
+      } else {
+        return (
+          <DrawioViewer
+            content={content}
+            file_path={metadata?.file_path}
+            fileRef={metadata?.fileRef}
+            workspace={metadata?.workspace}
+            isDirty={activeTab?.isDirty}
+            onContentChange={updateContent}
+          />
+        );
+      }
+    }
+
     // 其他类型：全屏预览 / Other types: Full-screen preview
     if (content_type === 'diff') {
       return (
@@ -1236,6 +1326,7 @@ const PreviewPanel: React.FC = () => {
             content_type={content_type}
             isMarkdown={isMarkdown}
             isHTML={isHTML}
+            isDrawio={isDrawio}
             viewMode={viewMode}
             isSplitScreenEnabled={isSplitScreenEnabled}
             file_name={metadata?.file_name || activeTab.title}

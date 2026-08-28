@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "도움말",
   "diagramGalleryOpenHint": "제목 표시줄을 두 번 클릭하여 갤러리에서 보기",
   "svgTitle": "SVG 그래픽",
-  "imageTitle": "이미지 미리보기"
+  "imageTitle": "이미지 미리보기",
+  "drawioTitle": "Draw.io 다이어그램",
+  "drawio": {
+    "title": "Draw.io 다이어그램",
+    "loading": "Draw.io 다이어그램 로딩 중...",
+    "loadFailed": "Draw.io 다이어그램 로드 실패",
+    "timeout": "Draw.io 다이어그램 로드 시간 초과",
+    "page": "{{page}} 페이지",
+    "diagramView": "다이어그램 미리보기",
+    "sourceView": "XML 소스",
+    "fitView": "화면에 맞추기",
+    "zoomIn": "확대",
+    "zoomOut": "축소",
+    "openInApp": "Diagrams.net에서 열기"
+  }
 }

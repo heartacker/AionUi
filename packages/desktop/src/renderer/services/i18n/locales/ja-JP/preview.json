@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "ヘルプ",
   "diagramGalleryOpenHint": "タイトルバーをダブルクリックしてギャラリーで表示",
   "svgTitle": "SVG ベクター画像",
-  "imageTitle": "画像プレビュー"
+  "imageTitle": "画像プレビュー",
+  "drawioTitle": "Draw.io ダイアグラム",
+  "drawio": {
+    "title": "Draw.io ダイアグラム",
+    "loading": "Draw.io ダイアグラムを読み込み中...",
+    "loadFailed": "Draw.io ダイアグラムの読み込みに失敗しました",
+    "timeout": "Draw.io ダイアグラムの読み込みがタイムアウトしました",
+    "page": "{{page}} ページ",
+    "diagramView": "ダイアグラムプレビュー",
+    "sourceView": "XML ソース",
+    "fitView": "全体表示",
+    "zoomIn": "拡大",
+    "zoomOut": "縮小",
+    "openInApp": "Diagrams.net で開く"
+  }
 }

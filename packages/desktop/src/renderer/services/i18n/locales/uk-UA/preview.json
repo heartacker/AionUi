@@ -197,5 +197,19 @@
   "diagramGalleryHelp": "Довідка",
   "diagramGalleryOpenHint": "Двічі клацніть заголовок, щоб відкрити в галереї",
   "svgTitle": "SVG-зображення",
-  "imageTitle": "Попередній перегляд зображення"
+  "imageTitle": "Попередній перегляд зображення",
+  "drawioTitle": "Діаграма Draw.io",
+  "drawio": {
+    "title": "Діаграма Draw.io",
+    "loading": "Завантаження діаграми Draw.io...",
+    "loadFailed": "Не вдалося завантажити діаграму Draw.io",
+    "timeout": "Перевищено час очікування завантаження діаграми Draw.io",
+    "page": "Сторінка {{page}}",
+    "diagramView": "Попередній перегляд діаграми",
+    "sourceView": "XML-код",
+    "fitView": "За розміром вікна",
+    "zoomIn": "Збільшити",
+    "zoomOut": "Зменшити",
+    "openInApp": "Відкрити в Diagrams.net"
+  }
 }

@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "Yardım",
   "diagramGalleryOpenHint": "Galeride açmak için başlık çubuğuna çift tıklayın",
   "svgTitle": "SVG Grafiği",
-  "imageTitle": "Görsel Önizleme"
+  "imageTitle": "Görsel Önizleme",
+  "drawioTitle": "Draw.io Şeması",
+  "drawio": {
+    "title": "Draw.io Şeması",
+    "loading": "Draw.io şeması yükleniyor...",
+    "loadFailed": "Draw.io şeması yüklenemedi",
+    "timeout": "Draw.io şeması yükleme zaman aşımına uğradı",
+    "page": "Sayfa {{page}}",
+    "diagramView": "Şema Önizlemesi",
+    "sourceView": "XML Kaynağı",
+    "fitView": "Görünüme Sığdır",
+    "zoomIn": "Yakınlaştır",
+    "zoomOut": "Uzaklaştır",
+    "openInApp": "Diagrams.net'te Aç"
+  }
 }

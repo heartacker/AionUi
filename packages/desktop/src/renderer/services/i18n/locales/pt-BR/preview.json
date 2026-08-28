@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "Ajuda",
   "diagramGalleryOpenHint": "Clique duas vezes na barra de título para abrir na galeria",
   "svgTitle": "Gráfico SVG",
-  "imageTitle": "Pré-visualização de Imagem"
+  "imageTitle": "Pré-visualização de Imagem",
+  "drawioTitle": "Diagrama Draw.io",
+  "drawio": {
+    "title": "Diagrama Draw.io",
+    "loading": "Carregando diagrama Draw.io...",
+    "loadFailed": "Falha ao carregar diagrama Draw.io",
+    "timeout": "Tempo limite de carregamento do diagrama Draw.io excedido",
+    "page": "Página {{page}}",
+    "diagramView": "Visualização do diagrama",
+    "sourceView": "Código XML",
+    "fitView": "Ajustar à tela",
+    "zoomIn": "Aumentar zoom",
+    "zoomOut": "Diminuir zoom",
+    "openInApp": "Abrir no Diagrams.net"
+  }
 }

@@ -72,6 +72,12 @@ describe('fileUtils', () => {
       expect(getContentTypeByExtension('changes.diff')).toBe('diff');
     });
 
+    it('returns drawio for .drawio, .dio and compound .drawio.xml', () => {
+      expect(getContentTypeByExtension('diagram.drawio')).toBe('drawio');
+      expect(getContentTypeByExtension('workflow.dio')).toBe('drawio');
+      expect(getContentTypeByExtension('system.drawio.xml')).toBe('drawio');
+    });
+
     it('returns code as default for unknown extension', () => {
       expect(getContentTypeByExtension('script.ts')).toBe('code');
       expect(getContentTypeByExtension('app.jsx')).toBe('code');
@@ -92,6 +98,7 @@ describe('fileUtils', () => {
     it('returns false for non-image files', () => {
       expect(isImageFile('document.pdf')).toBe(false);
       expect(isImageFile('script.ts')).toBe(false);
+      expect(isImageFile('diagram.drawio')).toBe(false);
     });
   });
 
@@ -100,6 +107,8 @@ describe('fileUtils', () => {
       expect(isTextFile('README.md')).toBe(true);
       expect(isTextFile('index.html')).toBe(true);
       expect(isTextFile('script.ts')).toBe(true);
+      expect(isTextFile('diagram.drawio')).toBe(true);
+      expect(isTextFile('flow.dio')).toBe(true);
     });
 
     it('returns false for binary types', () => {
@@ -119,6 +128,7 @@ describe('fileUtils', () => {
     it('returns false for non-Office types', () => {
       expect(isOfficeFile('photo.png')).toBe(false);
       expect(isOfficeFile('script.ts')).toBe(false);
+      expect(isOfficeFile('diagram.drawio')).toBe(false);
     });
   });
 
@@ -131,6 +141,11 @@ describe('fileUtils', () => {
     it('contains image extensions', () => {
       expect(FILE_EXTENSION_MAP.image).toContain('png');
       expect(FILE_EXTENSION_MAP.image).toContain('svg');
+    });
+
+    it('contains drawio extensions', () => {
+      expect(FILE_EXTENSION_MAP.drawio).toContain('drawio');
+      expect(FILE_EXTENSION_MAP.drawio).toContain('dio');
     });
   });
 });
