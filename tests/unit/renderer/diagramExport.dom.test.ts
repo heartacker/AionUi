@@ -82,7 +82,7 @@ describe('convertForeignObjectToSvgText', () => {
     expect(result).not.toContain('foreignObject');
     expect(result).toContain('<text x="0" y="0" text-anchor="middle"');
     expect(result).toContain('<tspan x="0"');
-    expect(result).toContain('font-weight="bold">1. ATOM-Die</tspan>');
+    expect(result).toContain('font-weight="600">1. ATOM-Die</tspan>');
     expect(result).toContain('• 容量: 64MB</tspan>');
     expect(result).toContain('• 算力: 32 TOPS (INT8)</tspan>');
   });
