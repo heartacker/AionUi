@@ -105,6 +105,61 @@ const toFixedSizeSvg = (svg: string, scale: number): string => {
   });
 };
 
+const wrapTextToWidth = (text: string, maxWidth: number): string[] => {
+  if (!text || maxWidth <= 0) return [text];
+
+  const measure = (str: string): number => {
+    let width = 0;
+    for (let i = 0; i < str.length; i++) {
+      width += str.charCodeAt(i) > 255 ? 14 : 7.8;
+    }
+    return width;
+  };
+
+  if (measure(text) <= maxWidth) {
+    return [text];
+  }
+
+  // Tokenize into words and CJK characters
+  const tokens: string[] = [];
+  let currentToken = '';
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char.charCodeAt(0) > 255 || /\s/.test(char) || /[，。、；：！？（）()[\],.]/.test(char)) {
+      if (currentToken) {
+        tokens.push(currentToken);
+        currentToken = '';
+      }
+      tokens.push(char);
+    } else {
+      currentToken += char;
+    }
+  }
+  if (currentToken) tokens.push(currentToken);
+
+  const lines: string[] = [];
+  let currentLine = '';
+  let currentWidth = 0;
+
+  for (const token of tokens) {
+    const tokenWidth = measure(token);
+    if (currentWidth + tokenWidth > maxWidth && currentLine.length > 0) {
+      lines.push(currentLine.trim());
+      currentLine = token.trimStart();
+      currentWidth = measure(currentLine);
+    } else {
+      currentLine += token;
+      currentWidth += tokenWidth;
+    }
+  }
+
+  if (currentLine.trim()) {
+    lines.push(currentLine.trim());
+  }
+
+  return lines;
+};
+
 /**
  * Convert HTML inside <foreignObject> into standards-compliant, multi-line SVG <text> with <tspan> lines.
  * This guarantees:
@@ -134,6 +189,7 @@ export const convertForeignObjectToSvgText = (
 
       const centerX = x + w / 2;
       const centerY = y + h / 2;
+      const maxLineWidth = Math.max(140, w > 0 ? w * 1.08 : 200);
 
       // Extract explicit color from inline styles if present
       const colorMatch = /\bcolor\s*:\s*([^;"]+)/i.exec(content);
@@ -166,7 +222,10 @@ export const convertForeignObjectToSvgText = (
           .replace(/&gt;/g, '>')
           .trim();
         if (cleanText) {
-          lines.push({ text: cleanText, isBold });
+          const wrapped = wrapTextToWidth(cleanText, maxLineWidth);
+          for (const line of wrapped) {
+            lines.push({ text: line, isBold });
+          }
         }
       }
 

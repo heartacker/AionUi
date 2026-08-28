@@ -37,6 +37,9 @@ const MERMAID_ZOOM_STEP = 0.25;
 // overlay) instead of a pan, when drag-to-pan is enabled.
 const PAN_CLICK_THRESHOLD = 4;
 
+const MERMAID_FONT_FAMILY =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+
 let initializedTheme: 'light' | 'dark' | null = null;
 const ensureMermaidInitialized = (theme: 'light' | 'dark') => {
   if (initializedTheme === theme) return;
@@ -45,7 +48,8 @@ const ensureMermaidInitialized = (theme: 'light' | 'dark') => {
     securityLevel: 'strict',
     suppressErrorRendering: true,
     theme: theme === 'dark' ? 'dark' : 'default',
-    fontFamily: 'inherit',
+    fontFamily: MERMAID_FONT_FAMILY,
+    fontSize: 14,
   });
   initializedTheme = theme;
 };
@@ -181,13 +185,20 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
         const { svg: renderedSvg } = await mermaid.render(`${blockIdRef.current}-${Date.now()}`, source);
 
         if (!cancelled) {
-          setSvg(withResponsiveSvg(renderedSvg));
+          const withVisibleOverflow = renderedSvg.replace(/<foreignObject\b([^>]*)>/gi, (match, attrs) => {
+            if (/style\s*=/i.test(attrs)) {
+              return match.replace(
+                /style\s*=\s*(["'])(.*?)\1/i,
+                (_m, q, val) => `style=${q}${val}; overflow: visible;${q}`
+              );
+            }
+            return `<foreignObject${attrs} style="overflow: visible;">`;
+          });
+          setSvg(withResponsiveSvg(withVisibleOverflow));
           // Reset the view whenever a fresh diagram renders so a re-render never leaves the
           // user staring at an off-screen, zoomed-in fragment of the previous diagram.
-          // A re-render also replaces the overlay content, so close it as well. Batched with
-          // setSvg on purpose (see the NOTE above the pan/zoom state).
+          // Batched with setSvg on purpose (see the NOTE above the pan/zoom state).
           setTransform({ scale: 1, x: 0, y: 0 });
-          setIsZoomOpen(false);
           setIsRendering(false);
           setViewMode(preferredViewModeRef.current === 'source' ? 'source' : 'preview');
         }
