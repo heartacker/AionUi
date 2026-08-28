@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanSvgForXml,
+  convertForeignObjectToSvgText,
   copyPngViaExecCommand,
   copySvgImage,
   ensureSvgNamespaces,
@@ -70,6 +71,20 @@ describe('ensureSvgNamespaces', () => {
     const result = ensureSvgNamespaces(raw);
     expect(result).toContain('xmlns="http://www.w3.org/2000/svg"');
     expect(result).toContain('xmlns:xlink="http://www.w3.org/1999/xlink"');
+  });
+});
+
+describe('convertForeignObjectToSvgText', () => {
+  it('converts multi-line HTML into multi-line SVG text with tspans and bold styles', () => {
+    const raw =
+      '<svg><foreignObject x="-90" y="-45" width="180" height="90"><div xmlns="http://www.w3.org/1999/xhtml"><span><b>1. ATOM-Die</b><br/>• 容量: 64MB<br/>• 算力: 32 TOPS (INT8)</span></div></foreignObject></svg>';
+    const result = convertForeignObjectToSvgText(raw);
+    expect(result).not.toContain('foreignObject');
+    expect(result).toContain('<text x="0" y="0" text-anchor="middle"');
+    expect(result).toContain('<tspan x="0"');
+    expect(result).toContain('font-weight="bold">1. ATOM-Die</tspan>');
+    expect(result).toContain('• 容量: 64MB</tspan>');
+    expect(result).toContain('• 算力: 32 TOPS (INT8)</tspan>');
   });
 });
 
