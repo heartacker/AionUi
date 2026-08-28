@@ -19,8 +19,8 @@ export type SvgToPngOptions = {
 const PNG_SCALE = 2;
 
 /**
- * Fix unclosed void HTML tags (e.g. <br>, <hr>, <img>) and named entities
- * so the SVG complies with strict XML parsers when opened standalone.
+ * Fix unclosed void HTML tags (e.g. <br>, <hr>, <img>, <input>) and named entities
+ * so the SVG complies with strict XML parsers when opened standalone or loaded in Image.
  */
 export const cleanSvgForXml = (svg: string): string => {
   if (!svg) return svg;
@@ -29,7 +29,13 @@ export const cleanSvgForXml = (svg: string): string => {
     .replace(/<br(?:\s*|\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
     .replace(/<hr(?:\s*|\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
     .replace(/<img(?:\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
-    .replace(/&nbsp;/g, '&#160;');
+    .replace(/<input(?:\s+[^>/]*)>/gi, (match) => (match.endsWith('/>') ? match : `${match.slice(0, -1)}/>`))
+    .replace(/&nbsp;/g, '&#160;')
+    .replace(/&bull;/g, '&#8226;')
+    .replace(/&hellip;/g, '&#8230;')
+    .replace(/&mdash;/g, '&#8212;')
+    .replace(/&ndash;/g, '&#8211;')
+    .replace(/&copy;/g, '&#169;');
 };
 
 /**
@@ -103,40 +109,6 @@ export const buildSvgBlob = (svg: string): Blob =>
   new Blob([cleanSvgForXml(ensureSvgNamespaces(svg))], { type: 'image/svg+xml;charset=utf-8' });
 
 /**
- * Convert any HTML inside <foreignObject> into pure SVG <text> elements
- * so rasterization never taints the canvas in browser contexts.
- */
-export const sanitizeSvgForRasterization = (svg: string): string => {
-  if (!svg || !svg.includes('foreignObject')) return svg;
-
-  return svg.replace(
-    /<foreignObject\b([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
-    (_match, attrs: string, content: string) => {
-      const xMatch = /\bx\s*=\s*["']([\d.]+)["']/i.exec(attrs);
-      const yMatch = /\by\s*=\s*["']([\d.]+)["']/i.exec(attrs);
-      const wMatch = /\bwidth\s*=\s*["']([\d.]+)["']/i.exec(attrs);
-      const hMatch = /\bheight\s*=\s*["']([\d.]+)["']/i.exec(attrs);
-
-      const x = xMatch ? parseFloat(xMatch[1]) : 0;
-      const y = yMatch ? parseFloat(yMatch[1]) : 0;
-      const w = wMatch ? parseFloat(wMatch[1]) : 0;
-      const h = hMatch ? parseFloat(hMatch[1]) : 0;
-
-      const centerX = x + w / 2;
-      const centerY = y + h / 2;
-
-      const text = content
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (!text) return '';
-
-      return `<text x="${centerX}" y="${centerY}" text-anchor="middle" dominant-baseline="central" fill="currentColor" font-family="sans-serif" font-size="14">${text}</text>`;
-    }
-  );
-};
-
-/**
  * Rasterize a diagram SVG into a PNG blob. Supports transparent background or theme-matched background.
  */
 export const svgToPngBlob = (svg: string, options?: SvgToPngOptions): Promise<Blob> =>
@@ -147,7 +119,7 @@ export const svgToPngBlob = (svg: string, options?: SvgToPngOptions): Promise<Bl
       return;
     }
 
-    const cleanSvg = sanitizeSvgForRasterization(cleanSvgForXml(ensureSvgNamespaces(svg)));
+    const cleanSvg = cleanSvgForXml(ensureSvgNamespaces(svg));
     const sizedSvg = toFixedSizeSvg(cleanSvg, PNG_SCALE);
     const blob = buildSvgBlob(sizedSvg);
     const url = URL.createObjectURL(blob);
