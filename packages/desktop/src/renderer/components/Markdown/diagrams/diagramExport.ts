@@ -111,8 +111,13 @@ const toFixedSizeSvg = (svg: string, scale: number): string => {
  * 1. Zero canvas tainting in Chromium/WebKit (PNG export and clipboard write succeed 100% of the time).
  * 2. Multi-line typography, bold weight, bullet points, font-size and alignment match onscreen rendering.
  */
-export const convertForeignObjectToSvgText = (svg: string): string => {
+export const convertForeignObjectToSvgText = (
+  svg: string,
+  options?: { isDark?: boolean; textColor?: string }
+): string => {
   if (!svg || !svg.includes('foreignObject')) return svg;
+
+  const defaultTextColor = options?.textColor || (options?.isDark ? '#e5e6eb' : '#1d2129');
 
   return svg.replace(
     /<foreignObject\b([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
@@ -130,15 +135,16 @@ export const convertForeignObjectToSvgText = (svg: string): string => {
       const centerX = x + w / 2;
       const centerY = y + h / 2;
 
-      // Extract style/color if present
+      // Extract explicit color from inline styles if present
       const colorMatch = /\bcolor\s*:\s*([^;"]+)/i.exec(content);
-      const fill = colorMatch ? colorMatch[1].trim() : 'currentColor';
+      const fill = colorMatch ? colorMatch[1].trim() : defaultTextColor;
 
       // Split content into lines by block tags or line breaks
       const normalized = content
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n')
-        .replace(/<\/div>/gi, '\n');
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<\/h[1-6]>/gi, '\n');
 
       const rawLines = normalized.split('\n');
       const lines: Array<{ text: string; isBold: boolean }> = [];
@@ -166,26 +172,26 @@ export const convertForeignObjectToSvgText = (svg: string): string => {
 
       if (lines.length === 0) return '';
 
-      const lineHeight = 1.35;
+      const lineHeight = 1.45;
       const totalHeightEm = (lines.length - 1) * lineHeight;
       const startDy = -(totalHeightEm / 2);
 
       const tspans = lines
         .map((line, index) => {
           const dy = index === 0 ? `${startDy.toFixed(2)}em` : `${lineHeight}em`;
-          const boldAttr = line.isBold ? ' font-weight="bold"' : '';
+          const boldAttr = line.isBold ? ' font-weight="600"' : ' font-weight="400"';
           const escaped = line.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
           return `<tspan x="${centerX}" dy="${dy}"${boldAttr}>${escaped}</tspan>`;
         })
         .join('');
 
-      return `<text x="${centerX}" y="${centerY}" text-anchor="middle" dominant-baseline="central" fill="${fill}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="13">${tspans}</text>`;
+      return `<text x="${centerX}" y="${centerY}" text-anchor="middle" dominant-baseline="central" stroke="none" fill="${fill}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif" font-size="14">${tspans}</text>`;
     }
   );
 };
 
-export const buildSvgBlob = (svg: string): Blob =>
-  new Blob([convertForeignObjectToSvgText(cleanSvgForXml(ensureSvgNamespaces(svg)))], {
+export const buildSvgBlob = (svg: string, options?: { isDark?: boolean; textColor?: string }): Blob =>
+  new Blob([convertForeignObjectToSvgText(cleanSvgForXml(ensureSvgNamespaces(svg)), options)], {
     type: 'image/svg+xml;charset=utf-8',
   });
 
@@ -200,9 +206,9 @@ export const svgToPngBlob = (svg: string, options?: SvgToPngOptions): Promise<Bl
       return;
     }
 
-    const cleanSvg = convertForeignObjectToSvgText(cleanSvgForXml(ensureSvgNamespaces(svg)));
+    const cleanSvg = convertForeignObjectToSvgText(cleanSvgForXml(ensureSvgNamespaces(svg)), options);
     const sizedSvg = toFixedSizeSvg(cleanSvg, PNG_SCALE);
-    const blob = buildSvgBlob(sizedSvg);
+    const blob = buildSvgBlob(sizedSvg, options);
     const url = URL.createObjectURL(blob);
     const image = new Image();
     image.crossOrigin = 'anonymous';
