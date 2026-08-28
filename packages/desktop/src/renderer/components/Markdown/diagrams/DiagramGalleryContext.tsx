@@ -21,6 +21,8 @@ export type DiagramItem = {
   title?: string;
   /** Card backdrop for diagrams whose strokes depend on it (WaveDrom dark skin). */
   panelBackground?: string;
+  /** Whether the diagram was rendered for dark theme. */
+  isDark?: boolean;
 };
 
 export type DiagramGalleryContextValue = {

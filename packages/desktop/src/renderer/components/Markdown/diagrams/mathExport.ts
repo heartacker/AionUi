@@ -1,20 +1,135 @@
-/**
- * @license
- * Copyright 2025 AionUi (aionui.com)
- * SPDX-License-Identifier: Apache-2.0
- */
+import katex from 'katex';
 
 /**
  * Math (KaTeX) diagram SVG construction and standalone-export preparation.
- *
- * KaTeX renders to HTML, so MathBlock measures the rendered formula in the DOM
- * and wraps it in an SVG `<foreignObject>` — that SVG string is what joins the
- * unified diagram pipeline (gallery overlay, copy-image, save-image).
- *
- * The inline SVG relies on the page's KaTeX stylesheet. For standalone export
- * (clipboard / file) the KaTeX CSS — including its fonts, inlined as data URLs
- * — is injected into the SVG so it renders without the host page.
  */
+
+/**
+ * Render KaTeX formula to a standards-compliant, pure SVG with native elements (<text>, <rect>, <path>).
+ * Contains ZERO <foreignObject>, so it never taints the HTML canvas and can be exported to PNG / SVG
+ * across all browsers, WebUI and Electron without security blocks.
+ */
+export const renderKatexToPureSvg = (
+  formula: string,
+  targetTheme: 'light' | 'dark' = 'light',
+  fontSize = 20
+): string => {
+  if (typeof document === 'undefined' || !formula) return '';
+  const div = document.createElement('div');
+  div.style.position = 'absolute';
+  div.style.left = '-99999px';
+  div.style.top = '-99999px';
+  div.style.fontSize = `${fontSize}px`;
+  div.style.lineHeight = '1.2';
+  div.style.visibility = 'hidden';
+  document.body.appendChild(div);
+
+  try {
+    katex.render(formula, div, {
+      displayMode: true,
+      throwOnError: false,
+      output: 'html',
+    });
+
+    const katexEl = div.querySelector<HTMLElement>('.katex-html') || div.querySelector<HTMLElement>('.katex') || div;
+    const baseRect = katexEl.getBoundingClientRect();
+    const isZeroRectEnv = baseRect.width === 0 && baseRect.height === 0;
+    const padding = 16;
+
+    const fillColor = targetTheme === 'dark' ? '#e5e6eb' : '#1d2129';
+    const svgElements: string[] = [];
+    let jsdomCursorX = padding;
+
+    // 1. Process all horizontal rule / fraction lines
+    const lineElements = div.querySelectorAll<HTMLElement>('.frac-line, .rule, .hline, .stretchy');
+    const processedElements = new Set<Element>();
+
+    for (const el of Array.from(lineElements)) {
+      const rect = el.getBoundingClientRect();
+      if (!isZeroRectEnv && rect.width > 0 && rect.height > 0) {
+        const x = rect.left - (baseRect.left - padding);
+        const y = rect.top - (baseRect.top - padding);
+        const h = Math.max(1, rect.height);
+        svgElements.push(
+          `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${rect.width.toFixed(2)}" height="${h.toFixed(2)}" fill="${fillColor}" stroke="none"/>`
+        );
+        processedElements.add(el);
+      }
+    }
+
+    // 2. Process all embedded SVG paths (e.g. square roots, large brackets)
+    const svgs = div.querySelectorAll<SVGSVGElement>('svg');
+    for (const svg of Array.from(svgs)) {
+      const rect = svg.getBoundingClientRect();
+      const paths = svg.querySelectorAll<SVGPathElement>('path');
+      const x = isZeroRectEnv ? jsdomCursorX : rect.left - (baseRect.left - padding);
+      const y = isZeroRectEnv ? padding : rect.top - (baseRect.top - padding);
+      const viewBox = svg.getAttribute('viewBox') || `0 0 ${rect.width || 20} ${rect.height || 20}`;
+      const pathMarkup = Array.from(paths)
+        .map((p) => `<path d="${p.getAttribute('d')}" fill="${fillColor}" stroke="none"/>`)
+        .join('');
+      if (pathMarkup) {
+        const w = (rect.width || 20).toFixed(2);
+        const h = (rect.height || 20).toFixed(2);
+        svgElements.push(
+          `<g transform="translate(${x}, ${y})"><svg width="${w}" height="${h}" viewBox="${viewBox}">${pathMarkup}</svg></g>`
+        );
+        if (isZeroRectEnv) jsdomCursorX += 24;
+      }
+      processedElements.add(svg);
+    }
+
+    // 3. Process all text glyphs
+    const walker = document.createTreeWalker(katexEl, NodeFilter.SHOW_TEXT);
+    let textNode: Node | null;
+    while ((textNode = walker.nextNode())) {
+      const text = textNode.textContent?.trim();
+      if (!text) continue;
+      const parent = textNode.parentElement;
+      if (!parent || processedElements.has(parent) || parent.closest('svg')) continue;
+
+      // Skip invisible MathML annotations
+      if (parent.closest('.katex-mathml')) continue;
+
+      const rect = parent.getBoundingClientRect();
+      if (!isZeroRectEnv && (rect.width <= 0 || rect.height <= 0)) continue;
+
+      const style = window.getComputedStyle(parent);
+      const parentFontSize = parseFloat(style.fontSize) || fontSize;
+      const fontFamily = style.fontFamily || 'KaTeX_Main, Times New Roman, serif';
+      const fontStyle = style.fontStyle || 'normal';
+      const fontWeight = style.fontWeight || 'normal';
+
+      let x: string;
+      let y: string;
+
+      if (isZeroRectEnv) {
+        x = jsdomCursorX.toFixed(2);
+        y = (padding + parentFontSize).toFixed(2);
+        jsdomCursorX += Math.max(8, text.length * parentFontSize * 0.6);
+      } else {
+        x = (rect.left - (baseRect.left - padding)).toFixed(2);
+        y = (rect.top - (baseRect.top - padding) + rect.height * 0.82).toFixed(2);
+      }
+
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      svgElements.push(
+        `<text x="${x}" y="${y}" font-family="${fontFamily}" font-size="${parentFontSize}px" font-style="${fontStyle}" font-weight="${fontWeight}" fill="${fillColor}" stroke="none">${escaped}</text>`
+      );
+    }
+
+    const width = isZeroRectEnv
+      ? Math.max(100, Math.ceil(jsdomCursorX + padding))
+      : Math.max(1, Math.ceil(baseRect.width) + padding * 2);
+    const height = isZeroRectEnv
+      ? Math.max(40, Math.ceil(fontSize * 2 + padding * 2))
+      : Math.max(1, Math.ceil(baseRect.height) + padding * 2);
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${svgElements.join('')}</svg>`;
+  } finally {
+    div.remove();
+  }
+};
 
 // Vertical/horizontal padding around the measured formula so italic overhangs
 // and tall glyphs never clip at the foreignObject edge. Glyph overhangs scale
@@ -150,11 +265,23 @@ let exportCssPromise: Promise<string> | null = null;
 
 /**
  * Prepare a MathBlock SVG for standalone export: embed the page's KaTeX CSS
- * (fonts inlined as data URLs) and pin the formula color to the light-theme
- * value, matching the white-backdrop rasterization of the shared pipeline.
+ * (fonts inlined as data URLs) and pin the formula color to the target-theme
+ * value (light or dark), matching the background of the export pipeline.
  * The CSS aggregation + font inlining runs once per app session.
  */
-export const prepareMathSvgForExport = async (svg: string): Promise<string> => {
+export const prepareMathSvgForExport = async (
+  svg: string,
+  targetTheme: 'light' | 'dark' = 'light',
+  code?: string
+): Promise<string> => {
+  if (code) {
+    try {
+      const pureSvg = renderKatexToPureSvg(code, targetTheme);
+      if (pureSvg) return pureSvg;
+    } catch (err) {
+      console.warn('[MathExport] renderKatexToPureSvg failed, falling back:', err);
+    }
+  }
   if (!exportCssPromise) {
     exportCssPromise = (async () => {
       try {
@@ -169,9 +296,12 @@ export const prepareMathSvgForExport = async (svg: string): Promise<string> => {
   }
   try {
     const css = await exportCssPromise;
-    const withColor = svg.replace(COLOR_STYLE_PATTERN, `$1${MATH_EXPORT_COLOR}$3`);
-    if (!css) return withColor;
-    return withColor.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => `<svg${attrs}><style>${css}</style>`);
+    const formulaColor = targetTheme === 'dark' ? '#e5e6eb' : MATH_EXPORT_COLOR;
+    const withColor = svg.replace(/(style="[^"]*color:\s*)([^;"]+)/i, `$1${formulaColor}`);
+    const themedCss = css
+      ? `${css}\n.katex { color: ${formulaColor} !important; }`
+      : `.katex { color: ${formulaColor} !important; }`;
+    return withColor.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => `<svg${attrs}><style>${themedCss}</style>`);
   } catch (err) {
     console.warn('[MathExport] prepareMathSvgForExport failed, returning raw SVG:', err);
     return svg;

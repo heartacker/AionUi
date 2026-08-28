@@ -42,6 +42,24 @@ function EchartsBlock({
   const preferredViewModeRef = useRef<'preview' | 'source'>('preview');
   const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>(() => {
+    return (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || (isDark ? 'dark' : 'light');
+  });
+
+  useEffect(() => {
+    const updateTheme = () => {
+      const theme = (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light';
+      setCurrentTheme(theme);
+    };
+
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
@@ -74,6 +92,9 @@ function EchartsBlock({
     return summary && summary.length > 0 ? `${summary.slice(0, 48)}${summary.length > 48 ? '...' : ''}` : undefined;
   }, [code]);
 
+  const isDarkTheme = currentTheme === 'dark';
+  const themeBackground = isDarkTheme ? '#1d2129' : '#ffffff';
+
   const galleryItem = useMemo(
     () =>
       snapshotSvg && viewMode === 'preview'
@@ -83,32 +104,37 @@ function EchartsBlock({
             code,
             type: 'chart' as const,
             title: previewSummary,
+            isDark: isDarkTheme,
+            panelBackground: themeBackground,
           }
         : null,
-    [snapshotSvg, viewMode, code, previewSummary]
+    [snapshotSvg, viewMode, code, previewSummary, isDarkTheme, themeBackground]
   );
   const gallery = useDiagramGallery(galleryItem);
 
   // Snapshot the canvas into an SVG-wrapped PNG data URL. 'finished' fires for
   // every interaction-frame render (tooltips, dataZoom...), so the snapshot is
   // debounced: one snapshot per settle, not one per frame.
-  const scheduleChartSnapshot = useCallback((instance: echarts.ECharts) => {
-    if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
-    snapshotTimerRef.current = setTimeout(() => {
-      snapshotTimerRef.current = null;
-      if (chartInstanceRef.current !== instance) return;
-      try {
-        const width = Math.round(instance.getWidth() * 2);
-        const height = Math.round(instance.getHeight() * 2);
-        const dataUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
-        if (width < 1 || height < 1 || !dataUrl) return;
-        setSnapshotSvg(buildChartSnapshotSvg(dataUrl, width, height));
-      } catch {
-        // A failed snapshot keeps the chart out of the gallery stream; the
-        // header double-click retries on demand.
-      }
-    }, 400);
-  }, []);
+  const scheduleChartSnapshot = useCallback(
+    (instance: echarts.ECharts) => {
+      if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
+      snapshotTimerRef.current = setTimeout(() => {
+        snapshotTimerRef.current = null;
+        if (chartInstanceRef.current !== instance) return;
+        try {
+          const width = Math.round(instance.getWidth() * 2);
+          const height = Math.round(instance.getHeight() * 2);
+          const dataUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: themeBackground });
+          if (width < 1 || height < 1 || !dataUrl) return;
+          setSnapshotSvg(buildChartSnapshotSvg(dataUrl, width, height));
+        } catch {
+          // A failed snapshot keeps the chart out of the gallery stream; the
+          // header double-click retries on demand.
+        }
+      }, 400);
+    },
+    [themeBackground]
+  );
 
   // Header double-click opens the gallery. The eager snapshot is normally
   // registered by then; the on-demand branch covers the first paint and
@@ -129,7 +155,7 @@ function EchartsBlock({
     try {
       const width = Math.round(chart.getWidth() * 2);
       const height = Math.round(chart.getHeight() * 2);
-      const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+      const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: themeBackground });
       if (width < 1 || height < 1 || !dataUrl) return;
       const item: DiagramItem = {
         id: blockIdRef.current,
@@ -137,6 +163,8 @@ function EchartsBlock({
         code,
         type: 'chart',
         title: previewSummary,
+        isDark: isDarkTheme,
+        panelBackground: themeBackground,
       };
       setSnapshotSvg(item.svg);
       gallery.openGalleryWithItem(item);
@@ -160,7 +188,7 @@ function EchartsBlock({
         snapshotTimerRef.current = null;
       }
 
-      const theme = isDark ? 'dark' : undefined;
+      const theme = isDarkTheme ? 'dark' : undefined;
       const instance = echarts.init(containerRef.current, theme, {
         renderer: 'canvas',
       });
@@ -184,7 +212,7 @@ function EchartsBlock({
         chartInstanceRef.current = null;
       }
     }
-  }, [parsedOption, isDark, scheduleChartSnapshot]);
+  }, [parsedOption, isDarkTheme, scheduleChartSnapshot]);
 
   useEffect(() => {
     if (viewMode !== 'preview' || !parsedOption) {
@@ -228,7 +256,6 @@ function EchartsBlock({
   }, [viewMode, parsedOption, initOrUpdateChart]);
 
   const isValidChart = parsedOption !== null;
-  const isDarkTheme = isDark;
   const codeTheme = isDarkTheme ? vs2015 : vs;
 
   return (

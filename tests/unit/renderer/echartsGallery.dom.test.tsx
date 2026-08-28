@@ -26,6 +26,7 @@ vi.mock('@/renderer/utils/ui/clipboard', () => ({
 vi.mock('@/renderer/components/Markdown/diagrams/diagramExport', () => ({
   copySvgImage: vi.fn().mockResolvedValue(undefined),
   saveDiagramImage: vi.fn().mockResolvedValue(undefined),
+  prepareDiagramSvgForExport: vi.fn((svg: string) => Promise.resolve(svg)),
 }));
 
 vi.mock('@/renderer/pages/conversation/Preview', () => ({
@@ -170,7 +171,7 @@ describe('ECharts gallery integration', () => {
     settleCharts();
 
     expect(mockGetDataURL).toHaveBeenCalledTimes(1);
-    expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+    expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' });
 
     fireEvent.doubleClick(screen.getByTestId('echarts-header'));
     expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
@@ -178,6 +179,18 @@ describe('ECharts gallery integration', () => {
     // Both the mermaid item and the eagerly registered chart are in the strip.
     expect(screen.getAllByTestId('diagram-gallery-thumb')).toHaveLength(2);
     expect(screen.getByTestId('diagram-gallery-counter')).toHaveTextContent('2');
+  });
+
+  it('snapshots with dark background when isDark is true', () => {
+    render(
+      <DiagramGalleryProvider>
+        <EchartsBlock code={VALID_CHART_CODE} isDark={true} />
+      </DiagramGalleryProvider>
+    );
+    settleCharts();
+
+    expect(mockGetDataURL).toHaveBeenCalledTimes(1);
+    expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#1d2129' });
   });
 
   it('includes ALL charts in the gallery stream, not only the opened one', () => {

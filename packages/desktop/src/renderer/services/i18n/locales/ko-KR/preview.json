@@ -188,8 +188,9 @@
   "diagramImageExportFailed": "이미지 내보내기 실패",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
-  "diagramFormatPngTransparent": "PNG (투명 배경)",
-  "diagramFormatPngTheme": "PNG (테마 배경)",
+  "diagramFormatPngLight": "PNG (밝은)",
+  "diagramFormatPngDark": "PNG (어두운)",
+  "diagramFormatPngTransparent": "PNG (투명)",
   "diagramGalleryHintTouch": "핀치로 확대/축소 • 드래그로 이동 • 스와이프로 다이어그램 전환",
   "diagramGalleryHelp": "도움말",
   "diagramGalleryOpenHint": "제목 표시줄을 두 번 클릭하여 갤러리에서 보기"

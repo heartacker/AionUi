@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { Message } from '@arco-design/web-react';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { getSvgIntrinsicSize, type DiagramSize } from '../markdownUtils';
-import { copySvgImage, saveDiagramImage, type DiagramExportFormat } from './diagramExport';
+import { copySvgImage, prepareDiagramSvgForExport, saveDiagramImage, type DiagramExportFormat } from './diagramExport';
 import { prepareMathSvgForExport } from './mathExport';
 import type { DiagramItem } from './DiagramGalleryContext';
 
@@ -474,7 +474,7 @@ function DiagramZoomOverlay({
 
   const exportOptions = useMemo(
     () => ({
-      themeBackground: cardBackground,
+      themeBackground: cardBackground || (isDarkTheme ? '#1d2129' : '#ffffff'),
       isDark: isDarkTheme,
     }),
     [cardBackground, isDarkTheme]
@@ -482,8 +482,6 @@ function DiagramZoomOverlay({
 
   const handleCopyImage = () => {
     if (!exportSvg) return;
-    // Math SVGs are foreignObject wrappers around KaTeX HTML and rely on the
-    // page stylesheet + theme color; make them standalone before exporting.
     const run = (readySvg: string) =>
       copySvgImage(readySvg, exportOptions)
         .then(() => {
@@ -495,23 +493,35 @@ function DiagramZoomOverlay({
           console.error('[DiagramGallery] copy image failed:', error);
           Message.error(t('preview.diagramImageExportFailed'));
         });
-    if (activeItem?.type !== 'math') {
-      void run(exportSvg);
+
+    if (activeItem?.type === 'math') {
+      void prepareMathSvgForExport(exportSvg, isDarkTheme ? 'dark' : 'light', activeItem?.code)
+        .then(run)
+        .catch((error: unknown) => {
+          console.warn('[DiagramGallery] prepareMathSvgForExport fallback to raw SVG:', error);
+          void run(exportSvg);
+        });
       return;
     }
-    void prepareMathSvgForExport(exportSvg)
-      .then(run)
-      .catch((error: unknown) => {
-        console.warn('[DiagramGallery] prepareMathSvgForExport fallback to raw SVG:', error);
-        void run(exportSvg);
-      });
+
+    void run(exportSvg);
   };
 
   const handleSaveImage = (format: DiagramExportFormat) => {
     if (!exportSvg) return;
-    const extension = format === 'svg' ? 'svg' : 'png';
+    const isWavedrom = activeItem?.type === 'wavedrom';
+    // WaveDrom only supports light theme (dark strokes).
+    // If the user requests dark PNG export, fall back to white background ('png-light')
+    // so waveforms stay fully readable, while transparent ('png-transparent') and light are fully supported.
+    const effectiveFormat = isWavedrom && format === 'png-dark' ? 'png-light' : format;
+    const extension = effectiveFormat === 'svg' ? 'svg' : 'png';
+    const effectiveOptions =
+      isWavedrom && format === 'png-dark'
+        ? { ...exportOptions, background: '#ffffff', themeBackground: '#ffffff', isDark: false, textColor: '#1d2129' }
+        : exportOptions;
+
     const run = (readySvg: string) =>
-      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, format, exportOptions)
+      saveDiagramImage(readySvg, `diagram-${exportIndex}-${Date.now()}.${extension}`, effectiveFormat, effectiveOptions)
         .then(() => {
           Message.success(t('conversation.history.exportSuccess'));
         })
@@ -519,14 +529,21 @@ function DiagramZoomOverlay({
           console.error('[DiagramGallery] save image failed:', error);
           Message.error(t('preview.diagramImageExportFailed'));
         });
-    if (activeItem?.type !== 'math') {
-      void run(exportSvg);
+
+    if (activeItem?.type === 'math') {
+      void prepareMathSvgForExport(exportSvg, effectiveFormat === 'png-dark' ? 'dark' : 'light', activeItem?.code)
+        .then(run)
+        .catch((error: unknown) => {
+          console.warn('[DiagramGallery] prepareMathSvgForExport fallback to raw SVG:', error);
+          void run(exportSvg);
+        });
       return;
     }
-    void prepareMathSvgForExport(exportSvg)
+
+    void prepareDiagramSvgForExport(exportSvg, activeItem, effectiveFormat)
       .then(run)
       .catch((error: unknown) => {
-        console.warn('[DiagramGallery] prepareMathSvgForExport fallback to raw SVG:', error);
+        console.warn('[DiagramGallery] prepareDiagramSvgForExport fallback to raw SVG:', error);
         void run(exportSvg);
       });
   };
@@ -770,6 +787,29 @@ function DiagramZoomOverlay({
               >
                 <button
                   type='button'
+                  data-testid='diagram-overlay-save-png-light'
+                  style={saveMenuItemStyle}
+                  onClick={() => {
+                    setSaveMenuOpen(false);
+                    handleSaveImage('png-light');
+                  }}
+                >
+                  {t('preview.diagramFormatPngLight')}
+                </button>
+                <button
+                  type='button'
+                  data-testid='diagram-overlay-save-png-dark'
+                  data-theme-save='true'
+                  style={saveMenuItemStyle}
+                  onClick={() => {
+                    setSaveMenuOpen(false);
+                    handleSaveImage('png-dark');
+                  }}
+                >
+                  {t('preview.diagramFormatPngDark')}
+                </button>
+                <button
+                  type='button'
                   data-testid='diagram-overlay-save-png-transparent'
                   style={saveMenuItemStyle}
                   onClick={() => {
@@ -778,18 +818,6 @@ function DiagramZoomOverlay({
                   }}
                 >
                   {t('preview.diagramFormatPngTransparent')}
-                </button>
-                <button
-                  type='button'
-                  data-testid='diagram-overlay-save-png'
-                  data-theme-save='true'
-                  style={saveMenuItemStyle}
-                  onClick={() => {
-                    setSaveMenuOpen(false);
-                    handleSaveImage('png-theme');
-                  }}
-                >
-                  {t('preview.diagramFormatPngTheme')}
                 </button>
                 <button
                   type='button'

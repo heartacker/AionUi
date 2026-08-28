@@ -188,8 +188,9 @@
   "diagramImageExportFailed": "No se pudo exportar la imagen",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
-  "diagramFormatPngTransparent": "PNG (Fondo transparente)",
-  "diagramFormatPngTheme": "PNG (Fondo del tema)",
+  "diagramFormatPngLight": "PNG (Claro)",
+  "diagramFormatPngDark": "PNG (Oscuro)",
+  "diagramFormatPngTransparent": "PNG (Transparente)",
   "diagramGalleryHintTouch": "Pellizcar para ampliar • Arrastrar para mover • Deslizar para cambiar",
   "diagramGalleryHelp": "Ayuda",
   "diagramGalleryOpenHint": "Haz doble clic en la barra de título para abrir en la galería"

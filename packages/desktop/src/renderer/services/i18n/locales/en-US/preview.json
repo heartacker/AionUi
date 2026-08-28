@@ -188,8 +188,9 @@
   "diagramImageExportFailed": "Failed to export diagram image",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
+  "diagramFormatPngLight": "PNG (Light)",
+  "diagramFormatPngDark": "PNG (Dark)",
   "diagramFormatPngTransparent": "PNG (Transparent)",
-  "diagramFormatPngTheme": "PNG (Theme Background)",
   "diagramGalleryHintTouch": "Pinch to zoom • Drag to pan • Swipe to switch diagrams",
   "diagramGalleryHelp": "Help",
   "diagramGalleryOpenHint": "Double-click the title bar to open in gallery"

@@ -188,8 +188,9 @@
   "diagramImageExportFailed": "خطا در خروجی تصویر نمودار",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
-  "diagramFormatPngTransparent": "PNG (پس‌زمینه شفاف)",
-  "diagramFormatPngTheme": "PNG (پس‌زمینه تم)",
+  "diagramFormatPngLight": "PNG (روشن)",
+  "diagramFormatPngDark": "PNG (تاریک)",
+  "diagramFormatPngTransparent": "PNG (شفاف)",
   "diagramGalleryHintTouch": "برای بزرگنمایی دو انگشت را باز کنید • برای جابه‌جایی بکشید • برای تعویض سوایپ کنید",
   "diagramGalleryHelp": "راهنما",
   "diagramGalleryOpenHint": "برای باز کردن در گالری، روی نوار عنوان دوبار کلیک کنید"
