@@ -287,11 +287,15 @@ export const getSvgIntrinsicSize = (svg: string): DiagramSize | null => {
   const svgTag = /<svg\b[^>]*>/i.exec(svg)?.[0];
   if (!svgTag) return null;
 
-  const viewBox = /viewBox\s*=\s*["']\s*[\d.eE+-]+\s+[\d.eE+-]+\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s*["']/i.exec(svgTag);
-  if (viewBox) {
-    const width = parseFloat(viewBox[1]);
-    const height = parseFloat(viewBox[2]);
-    if (width > 0 && height > 0) return { width, height };
+  const viewBoxAttr = /viewBox\s*=\s*["']([^"']+)["']/i.exec(svgTag);
+  if (viewBoxAttr) {
+    const parts = viewBoxAttr[1]
+      .trim()
+      .split(/[\s,]+/)
+      .map(parseFloat);
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
   }
 
   const widthAttr = /width\s*=\s*["']([\d.]+)\s*(?:px)?["']/i.exec(svgTag);

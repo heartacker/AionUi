@@ -157,13 +157,23 @@ let exportCssPromise: Promise<string> | null = null;
 export const prepareMathSvgForExport = async (svg: string): Promise<string> => {
   if (!exportCssPromise) {
     exportCssPromise = (async () => {
-      const css = collectKatexCss(document.styleSheets);
-      const baseUrl = document.baseURI || window.location.href;
-      return inlineFontUrls(css, baseUrl);
+      try {
+        const css = collectKatexCss(document.styleSheets);
+        const baseUrl = document.baseURI || window.location.href;
+        return await inlineFontUrls(css, baseUrl);
+      } catch (err) {
+        console.warn('[MathExport] Failed to collect KaTeX CSS/fonts:', err);
+        return '';
+      }
     })();
   }
-  const css = await exportCssPromise;
-  const withColor = svg.replace(COLOR_STYLE_PATTERN, `$1${MATH_EXPORT_COLOR}$3`);
-  if (!css) return withColor;
-  return withColor.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => `<svg${attrs}><style>${css}</style>`);
+  try {
+    const css = await exportCssPromise;
+    const withColor = svg.replace(COLOR_STYLE_PATTERN, `$1${MATH_EXPORT_COLOR}$3`);
+    if (!css) return withColor;
+    return withColor.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => `<svg${attrs}><style>${css}</style>`);
+  } catch (err) {
+    console.warn('[MathExport] prepareMathSvgForExport failed, returning raw SVG:', err);
+    return svg;
+  }
 };
