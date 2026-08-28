@@ -231,21 +231,40 @@ describe('DiagramZoomOverlay gallery mode', () => {
   it('copies the active diagram image (SVG+PNG) via the toolbar', () => {
     render(<GalleryHarness activeId='two' />);
     fireEvent.click(screen.getByTestId('diagram-overlay-copy-image'));
-    expect(copySvgImage).toHaveBeenCalledWith(SVG_WIDE);
+    expect(copySvgImage).toHaveBeenCalledWith(SVG_WIDE, expect.anything());
   });
 
-  it('saves the diagram as SVG (default, first) or PNG through the format menu', () => {
+  it('saves the diagram as SVG, PNG (theme) or PNG (transparent) through the format menu', () => {
     render(<GalleryHarness activeId='one' />);
 
     fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
     const svgItem = screen.getByTestId('diagram-overlay-save-svg');
     expect(svgItem).toHaveTextContent('preview.diagramFormatSvg');
     fireEvent.click(svgItem);
-    expect(saveDiagramImage).toHaveBeenLastCalledWith(SVG_SQUARE, expect.stringMatching(/\.svg$/), 'svg');
+    expect(saveDiagramImage).toHaveBeenLastCalledWith(
+      SVG_SQUARE,
+      expect.stringMatching(/\.svg$/),
+      'svg',
+      expect.anything()
+    );
 
     fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
     fireEvent.click(screen.getByTestId('diagram-overlay-save-png'));
-    expect(saveDiagramImage).toHaveBeenLastCalledWith(SVG_SQUARE, expect.stringMatching(/\.png$/), 'png');
+    expect(saveDiagramImage).toHaveBeenLastCalledWith(
+      SVG_SQUARE,
+      expect.stringMatching(/\.png$/),
+      'png-theme',
+      expect.anything()
+    );
+
+    fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
+    fireEvent.click(screen.getByTestId('diagram-overlay-save-png-transparent'));
+    expect(saveDiagramImage).toHaveBeenLastCalledWith(
+      SVG_SQUARE,
+      expect.stringMatching(/\.png$/),
+      'png-transparent',
+      expect.anything()
+    );
   });
 
   it('copies the source code from the toolbar when the gallery item carries it', () => {
@@ -273,7 +292,7 @@ describe('DiagramZoomOverlay gallery mode', () => {
     expect(screen.getByTestId('diagram-gallery-header')).toHaveTextContent('preview.mathTitle');
     fireEvent.click(screen.getByTestId('diagram-overlay-copy-image'));
     await waitFor(() => {
-      expect(copySvgImage).toHaveBeenCalledWith('<svg viewBox="0 0 10 10"></svg>-prepared');
+      expect(copySvgImage).toHaveBeenCalledWith('<svg viewBox="0 0 10 10"></svg>-prepared', expect.anything());
     });
   });
 

@@ -190,6 +190,8 @@
   "diagramImageExportFailed": "Не удалось экспортировать изображение",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
+  "diagramFormatPngTransparent": "PNG (прозрачный фон)",
+  "diagramFormatPngTheme": "PNG (фон темы)",
   "diagramGalleryHintTouch": "Щипок — масштаб • Перетаскивание — панорама • Свайп — переключение",
   "diagramGalleryHelp": "Справка",
   "diagramGalleryOpenHint": "Двойной щелчок по заголовку — просмотр в галерее"

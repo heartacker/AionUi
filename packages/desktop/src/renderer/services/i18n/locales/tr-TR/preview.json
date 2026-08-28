@@ -188,6 +188,8 @@
   "diagramImageExportFailed": "Diyagram görseli dışa aktarılamadı",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
+  "diagramFormatPngTransparent": "PNG (Şeffaf Arka Plan)",
+  "diagramFormatPngTheme": "PNG (Tema Arka Planı)",
   "diagramGalleryHintTouch": "Sıkıştırarak yakınlaştırın • Sürükleyerek taşıyın • Kaydırarak geçiş yapın",
   "diagramGalleryHelp": "Yardım",
   "diagramGalleryOpenHint": "Galeride açmak için başlık çubuğuna çift tıklayın"
