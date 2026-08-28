@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "Help",
   "diagramGalleryOpenHint": "Double-click the title bar to open in gallery",
   "svgTitle": "SVG Graphic",
-  "imageTitle": "Image Preview"
+  "imageTitle": "Image Preview",
+  "drawioTitle": "Draw.io Diagram",
+  "drawio": {
+    "title": "Draw.io Diagram",
+    "loading": "Loading Draw.io diagram...",
+    "loadFailed": "Failed to load Draw.io diagram",
+    "timeout": "Draw.io diagram loading timed out",
+    "page": "Page {{page}}",
+    "diagramView": "Diagram Preview",
+    "sourceView": "XML Source",
+    "fitView": "Fit to View",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "openInApp": "Open in Diagrams.net"
+  }
 }

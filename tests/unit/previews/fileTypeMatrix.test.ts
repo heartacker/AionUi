@@ -111,6 +111,9 @@ describe('unchanged mappings still hold', () => {
     ['logo.png', 'image'],
     ['change.diff', 'diff'],
     ['script.ts', 'code'],
+    ['diagram.drawio', 'drawio'],
+    ['flow.dio', 'drawio'],
+    ['model.drawio.xml', 'drawio'],
     ['noextension', 'code'],
   ] as const)('%s → %s', (name, expected) => {
     expect(getContentTypeByExtension(name)).toBe(expected);

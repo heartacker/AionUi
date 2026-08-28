@@ -34,6 +34,12 @@ interface PreviewToolbarProps {
   isHTML: boolean;
 
   /**
+   * 是否为 Draw.io 文件
+   * Whether it's a Draw.io file
+   */
+  isDrawio?: boolean;
+
+  /**
    * 当前视图模式
    * Current view mode
    */
@@ -173,6 +179,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   content_type,
   isMarkdown,
   isHTML,
+  isDrawio = false,
   viewMode,
   isSplitScreenEnabled,
   file_name,
@@ -212,9 +219,9 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   return (
     <div className='flex items-center justify-between h-32px px-10px bg-bg-2 flex-shrink-0 border-b border-border-1 overflow-x-auto'>
       <div className='flex items-center justify-between gap-8px w-full' style={{ minWidth: 'max-content' }}>
-        {/* 左侧：Tabs（Markdown/HTML）+ 文件名 / Left: Tabs (Markdown/HTML) + Filename */}
+        {/* 左侧：Tabs（Markdown/HTML/Drawio）+ 文件名 / Left: Tabs (Markdown/HTML/Drawio) + Filename */}
         <div className='flex items-center h-full gap-8px'>
-          {(isMarkdown || isHTML || isDiff) && !hasNoRenderableContent && (
+          {(isMarkdown || isHTML || isDiff || isDrawio) && !hasNoRenderableContent && (
             <>
               <div className='flex items-center h-full gap-0'>
                 <div
@@ -227,7 +234,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                     }
                   }}
                 >
-                  {isHTML ? t('preview.code') : t('preview.source')}
+                  {isHTML || isDrawio ? t('preview.code') : t('preview.source')}
                 </div>
                 <div
                   className={`flex items-center h-full px-10px cursor-pointer transition-all duration-150 text-12px font-medium ${viewMode === 'preview' ? 'text-brand bg-aou-2 border-b-4 border-brand' : 'text-t-secondary hover:text-t-primary hover:bg-bg-3'}`}

@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "راهنما",
   "diagramGalleryOpenHint": "برای باز کردن در گالری، روی نوار عنوان دوبار کلیک کنید",
   "svgTitle": "تصویر SVG",
-  "imageTitle": "پیش‌نمایش تصویر"
+  "imageTitle": "پیش‌نمایش تصویر",
+  "drawioTitle": "نمودار Draw.io",
+  "drawio": {
+    "title": "نمودار Draw.io",
+    "loading": "در حال بارگذاری نمودار Draw.io...",
+    "loadFailed": "بارگذاری نمودار Draw.io ناموفق بود",
+    "timeout": "مهلت بارگذاری نمودار Draw.io به پایان رسید",
+    "page": "صفحه {{page}}",
+    "diagramView": "پیش‌نمایش نمودار",
+    "sourceView": "کد منبع XML",
+    "fitView": "برازش در صفحه",
+    "zoomIn": "بزرگ‌نمایی",
+    "zoomOut": "کوچک‌نمایی",
+    "openInApp": "باز کردن در Diagrams.net"
+  }
 }

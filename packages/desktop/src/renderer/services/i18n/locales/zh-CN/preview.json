@@ -195,5 +195,19 @@
   "diagramGalleryHelp": "帮助",
   "diagramGalleryOpenHint": "双击标题栏在画册中查看",
   "svgTitle": "SVG 矢量图",
-  "imageTitle": "图片预览"
+  "imageTitle": "图片预览",
+  "drawioTitle": "Draw.io 图表",
+  "drawio": {
+    "title": "Draw.io 图表",
+    "loading": "正在加载 Draw.io 图表...",
+    "loadFailed": "加载 Draw.io 图表失败",
+    "timeout": "Draw.io 图表加载超时",
+    "page": "第 {{page}} 页",
+    "diagramView": "图表预览",
+    "sourceView": "XML 源码",
+    "fitView": "自适应大小",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "openInApp": "在 Diagrams.net 中打开"
+  }
 }
