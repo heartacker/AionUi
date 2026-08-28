@@ -188,8 +188,9 @@
   "diagramImageExportFailed": "匯出圖片失敗",
   "diagramFormatSvg": "SVG",
   "diagramFormatPng": "PNG",
-  "diagramFormatPngTransparent": "PNG（透明背景）",
-  "diagramFormatPngTheme": "PNG（主題背景）",
+  "diagramFormatPngLight": "PNG (淺色)",
+  "diagramFormatPngDark": "PNG (深色)",
+  "diagramFormatPngTransparent": "PNG (透明)",
   "diagramGalleryHintTouch": "雙指縮放 • 拖曳平移 • 左右滑動切換圖表",
   "diagramGalleryHelp": "說明",
   "diagramGalleryOpenHint": "雙擊標題列在畫冊中查看"

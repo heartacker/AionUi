@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React, { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +26,7 @@ vi.mock('@/renderer/utils/ui/clipboard', () => ({
 vi.mock('@/renderer/components/Markdown/diagrams/diagramExport', () => ({
   copySvgImage: vi.fn().mockResolvedValue(undefined),
   saveDiagramImage: vi.fn().mockResolvedValue(undefined),
+  prepareDiagramSvgForExport: vi.fn((svg: string) => Promise.resolve(svg)),
 }));
 
 vi.mock('@/renderer/components/Markdown/diagrams/mathExport', () => ({
@@ -234,13 +235,15 @@ describe('DiagramZoomOverlay gallery mode', () => {
     expect(copySvgImage).toHaveBeenCalledWith(SVG_WIDE, expect.anything());
   });
 
-  it('saves the diagram as SVG, PNG (theme) or PNG (transparent) through the format menu', () => {
+  it('saves the diagram as SVG, PNG (light), PNG (dark) or PNG (transparent) through the format menu', async () => {
     render(<GalleryHarness activeId='one' />);
 
     fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
     const svgItem = screen.getByTestId('diagram-overlay-save-svg');
     expect(svgItem).toHaveTextContent('preview.diagramFormatSvg');
-    fireEvent.click(svgItem);
+    await act(async () => {
+      fireEvent.click(svgItem);
+    });
     expect(saveDiagramImage).toHaveBeenLastCalledWith(
       SVG_SQUARE,
       expect.stringMatching(/\.svg$/),
@@ -249,21 +252,58 @@ describe('DiagramZoomOverlay gallery mode', () => {
     );
 
     fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
-    fireEvent.click(screen.getByTestId('diagram-overlay-save-png'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('diagram-overlay-save-png-light'));
+    });
     expect(saveDiagramImage).toHaveBeenLastCalledWith(
       SVG_SQUARE,
       expect.stringMatching(/\.png$/),
-      'png-theme',
+      'png-light',
       expect.anything()
     );
 
     fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
-    fireEvent.click(screen.getByTestId('diagram-overlay-save-png-transparent'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('diagram-overlay-save-png-dark'));
+    });
+    expect(saveDiagramImage).toHaveBeenLastCalledWith(
+      SVG_SQUARE,
+      expect.stringMatching(/\.png$/),
+      'png-dark',
+      expect.anything()
+    );
+
+    fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('diagram-overlay-save-png-transparent'));
+    });
     expect(saveDiagramImage).toHaveBeenLastCalledWith(
       SVG_SQUARE,
       expect.stringMatching(/\.png$/),
       'png-transparent',
       expect.anything()
+    );
+  });
+
+  it('falls back to white background for wavedrom when dark PNG export is requested', async () => {
+    render(
+      <DiagramZoomOverlay
+        items={[{ id: 'wave', svg: SVG_SQUARE, type: 'wavedrom', code: '{ signal: [] }' }]}
+        activeId='wave'
+        onNavigate={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('diagram-overlay-save-image'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('diagram-overlay-save-png-dark'));
+    });
+    expect(saveDiagramImage).toHaveBeenLastCalledWith(
+      SVG_SQUARE,
+      expect.stringMatching(/\.png$/),
+      'png-light',
+      expect.objectContaining({ background: '#ffffff' })
     );
   });
 

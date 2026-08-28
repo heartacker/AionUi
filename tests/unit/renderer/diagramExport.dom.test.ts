@@ -86,6 +86,14 @@ describe('convertForeignObjectToSvgText', () => {
     expect(result).toContain('• 容量: 64MB</tspan>');
     expect(result).toContain('• 算力: 32 TOPS (INT8)</tspan>');
   });
+
+  it('preserves KaTeX foreignObject without converting to plain text', () => {
+    const raw =
+      '<svg><foreignObject x="0" y="0" width="100" height="50"><div xmlns="http://www.w3.org/1999/xhtml" style="color:rgb(29, 33, 41)"><span class="katex"><span class="katex-html">E = mc^2</span></span></div></foreignObject></svg>';
+    const result = convertForeignObjectToSvgText(raw);
+    expect(result).toContain('foreignObject');
+    expect(result).toContain('class="katex"');
+  });
 });
 
 describe('extractEmbeddedRasterBlob', () => {
@@ -173,5 +181,21 @@ describe('saveDiagramImage', () => {
 
     expect(URL.createObjectURL).toHaveBeenCalled();
     expect(appendSpy).toHaveBeenCalled();
+  });
+});
+
+describe('prepareDiagramSvgForExport', () => {
+  it('returns fallback svg if item has no code', async () => {
+    const { prepareDiagramSvgForExport } = await import('@/renderer/components/Markdown/diagrams/diagramExport');
+    const result = await prepareDiagramSvgForExport('<svg>fallback</svg>', null, 'png-dark');
+    expect(result).toBe('<svg>fallback</svg>');
+  });
+
+  it('renders KaTeX math formula into pure native SVG with no foreignObject', async () => {
+    const { prepareDiagramSvgForExport } = await import('@/renderer/components/Markdown/diagrams/diagramExport');
+    const result = await prepareDiagramSvgForExport('<svg>old</svg>', { type: 'math', code: 'E = mc^2' }, 'png-dark');
+    expect(result).toContain('<svg');
+    expect(result).not.toContain('foreignObject');
+    expect(result).toContain('#e5e6eb');
   });
 });

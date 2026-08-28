@@ -7,12 +7,13 @@
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { getSvgIntrinsicSize } from '../markdownUtils';
 
-export type DiagramExportFormat = 'svg' | 'png' | 'png-transparent' | 'png-theme';
+export type DiagramExportFormat = 'svg' | 'png' | 'png-light' | 'png-dark' | 'png-transparent' | 'png-theme';
 
 export type SvgToPngOptions = {
   background?: 'transparent' | 'theme' | string;
   themeBackground?: string;
   isDark?: boolean;
+  textColor?: string;
 };
 
 // Rasterize at 2x the natural size so exported PNGs stay crisp on HiDPI.
@@ -176,7 +177,11 @@ export const convertForeignObjectToSvgText = (
 
   return svg.replace(
     /<foreignObject\b([^>]*)>([\s\S]*?)<\/foreignObject>/gi,
-    (_match, attrs: string, content: string) => {
+    (fullMatch, attrs: string, content: string) => {
+      // Do not convert KaTeX formula foreignObjects — they contain rich math layout & inlined fonts
+      if (content.includes('katex')) {
+        return fullMatch;
+      }
       const xMatch = /\bx\s*=\s*["']([-+]?[\d.]+)["']/i.exec(attrs);
       const yMatch = /\by\s*=\s*["']([-+]?[\d.]+)["']/i.exec(attrs);
       const wMatch = /\bwidth\s*=\s*["']([\d.]+)["']/i.exec(attrs);
@@ -465,11 +470,34 @@ export const saveDiagramImage = async (
   let blob: Blob;
 
   if (format === 'svg') {
-    blob = buildSvgBlob(cleanSvg);
+    blob = buildSvgBlob(cleanSvg, options);
+  } else if (format === 'png-light') {
+    blob = await svgToPngBlob(cleanSvg, {
+      ...options,
+      background: '#ffffff',
+      themeBackground: '#ffffff',
+      isDark: false,
+      textColor: '#1d2129',
+    });
+  } else if (format === 'png-dark') {
+    blob = await svgToPngBlob(cleanSvg, {
+      ...options,
+      background: '#1d2129',
+      themeBackground: '#1d2129',
+      isDark: true,
+      textColor: '#e5e6eb',
+    });
   } else if (format === 'png-transparent') {
-    blob = await svgToPngBlob(cleanSvg, { ...options, background: 'transparent' });
+    // Transparent PNG defaults to high-contrast dark text (#1d2129) so it is clearly
+    // readable when embedded into common light/white documents (Word, PPT, Notion, Web).
+    blob = await svgToPngBlob(cleanSvg, {
+      ...options,
+      background: 'transparent',
+      isDark: false,
+      textColor: '#1d2129',
+    });
   } else {
-    // format is 'png-theme' or 'png'
+    // format is 'png-theme' or legacy 'png'
     blob = await svgToPngBlob(cleanSvg, options);
   }
 
@@ -482,4 +510,89 @@ export const saveDiagramImage = async (
   anchor.remove();
   // Keep the URL alive until the download has started.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+};
+
+/**
+ * Re-renders the diagram for the requested export format/theme if source code is available.
+ * Ensures dark exports produce genuine dark-themed diagrams and light exports produce genuine light-themed diagrams.
+ */
+export const prepareDiagramSvgForExport = async (
+  svg: string,
+  item?: { code?: string; type?: string } | null,
+  format?: DiagramExportFormat
+): Promise<string> => {
+  if (!item || !item.code || !item.type) {
+    return svg;
+  }
+
+  const targetTheme: 'light' | 'dark' = format === 'png-dark' ? 'dark' : 'light';
+
+  if (item.type === 'mermaid') {
+    try {
+      const mermaid = (await import('mermaid')).default;
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        suppressErrorRendering: true,
+        theme: targetTheme === 'dark' ? 'dark' : 'default',
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+        fontSize: 14,
+      });
+      const id = `export-m-${targetTheme}-${Math.random().toString(36).slice(2, 10)}`;
+      const { svg: renderedSvg } = await mermaid.render(id, item.code);
+      return renderedSvg;
+    } catch (e) {
+      console.warn('[prepareDiagramSvgForExport] mermaid re-render failed:', e);
+      return svg;
+    }
+  }
+
+  if (item.type === 'chart') {
+    try {
+      const echarts = await import('echarts');
+      const { parseEChartsOption, buildChartSnapshotSvg } = await import('./echartsUtils');
+      const option = parseEChartsOption(item.code);
+      if (option && typeof document !== 'undefined') {
+        const div = document.createElement('div');
+        div.style.width = '700px';
+        div.style.height = '450px';
+        div.style.position = 'absolute';
+        div.style.left = '-99999px';
+        div.style.top = '-99999px';
+        document.body.appendChild(div);
+        try {
+          const chart = echarts.init(div, targetTheme === 'dark' ? 'dark' : undefined, { renderer: 'canvas' });
+          // animation: false ensures all series data, lines, bars, and legends render synchronously at frame 0
+          chart.setOption({ backgroundColor: 'transparent', animation: false, ...option });
+          const chartBg = format === 'png-transparent' ? 'transparent' : targetTheme === 'dark' ? '#1d2129' : '#ffffff';
+          const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: chartBg });
+          chart.dispose();
+          if (dataUrl) {
+            return buildChartSnapshotSvg(dataUrl, 1400, 900);
+          }
+        } finally {
+          div.remove();
+        }
+      }
+    } catch (e) {
+      console.warn('[prepareDiagramSvgForExport] echarts re-render failed:', e);
+      return svg;
+    }
+  }
+
+  if (item.type === 'math') {
+    try {
+      const { renderKatexToPureSvg } = await import('./mathExport');
+      const pureSvg = renderKatexToPureSvg(item.code, targetTheme);
+      if (pureSvg) {
+        return pureSvg;
+      }
+    } catch (e) {
+      console.warn('[prepareDiagramSvgForExport] math re-render failed:', e);
+      return svg;
+    }
+  }
+
+  return svg;
 };
