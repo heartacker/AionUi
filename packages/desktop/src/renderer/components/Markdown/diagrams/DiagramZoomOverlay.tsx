@@ -152,6 +152,7 @@ function DiagramZoomOverlay({
     originX: number;
     originY: number;
     moved: boolean;
+    isBackdrop?: boolean;
   } | null>(null);
   const pinchRef = useRef<{
     startDistance: number;
@@ -164,23 +165,50 @@ function DiagramZoomOverlay({
   const [isPanning, setIsPanning] = useState(false);
   const initialScaleRef = useRef(1);
 
-  // Adaptive layout: small screens get a wider footer and bigger touch targets;
-  // coarse pointers get a touch-oriented interaction hint.
-  const [isSmallScreen, setIsSmallScreen] = useState(() => matchMediaQuery('(max-width: 640px)'));
+  // Adaptive layout: mobile & tablet screens get edge-to-edge album view and bigger touch targets
+  const [isSmallScreen, setIsSmallScreen] = useState(
+    () => matchMediaQuery('(max-width: 640px)') || matchMediaQuery('(max-width: 768px)')
+  );
   const [isTouchDevice, setIsTouchDevice] = useState(() => matchMediaQuery('(pointer: coarse)'));
   useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const smallQuery = window.matchMedia('(max-width: 640px)');
-    const coarseQuery = window.matchMedia('(pointer: coarse)');
+    if (typeof window === 'undefined') return;
+    const small640 = window.matchMedia?.('(max-width: 640px)');
+    const small768 = window.matchMedia?.('(max-width: 768px)');
+    const coarseQuery = window.matchMedia?.('(pointer: coarse)');
     const update = () => {
-      setIsSmallScreen(smallQuery.matches);
-      setIsTouchDevice(coarseQuery.matches);
+      setIsSmallScreen(Boolean(small640?.matches || small768?.matches || window.innerWidth <= 768));
+      setIsTouchDevice(Boolean(coarseQuery?.matches));
     };
-    smallQuery.addEventListener?.('change', update);
-    coarseQuery.addEventListener?.('change', update);
+    small640?.addEventListener?.('change', update);
+    small768?.addEventListener?.('change', update);
+    coarseQuery?.addEventListener?.('change', update);
+    window.addEventListener('resize', update);
     return () => {
-      smallQuery.removeEventListener?.('change', update);
-      coarseQuery.removeEventListener?.('change', update);
+      small640?.removeEventListener?.('change', update);
+      small768?.removeEventListener?.('change', update);
+      coarseQuery?.removeEventListener?.('change', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  const isMobileOrTablet = isSmallScreen || isTouchDevice;
+
+  // Prevent background webpage scrolling or zooming when gallery overlay is open on touch devices
+  useEffect(() => {
+    const element = overlayRef.current;
+    if (!element) return;
+    const preventTouch = (event: TouchEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.('[data-testid="diagram-gallery-thumbs"], [data-testid="diagram-overlay-help-panel"]')) {
+        return;
+      }
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    };
+    element.addEventListener('touchmove', preventTouch, { passive: false });
+    return () => {
+      element.removeEventListener('touchmove', preventTouch);
     };
   }, []);
 
@@ -216,22 +244,22 @@ function DiagramZoomOverlay({
     if (width && height) setBase({ width, height });
   }, [overlaySvg, base]);
 
-  // Contain-fit the diagram into the viewport: the larger side constrains the
-  // scale so neither dimension overflows. Gallery mode reserves extra room at
-  // the bottom for the control bar + thumbnail strip, so a tall diagram never
-  // hides behind the footer.
+  // Contain-fit the diagram into the viewport: on mobile/tablet, expand to full screen width
+  // like a native photo album. Gallery mode reserves room at bottom for controls/thumbs.
   const hasThumbs = isGallery && (items?.length ?? 0) > 1;
   useLayoutEffect(() => {
     if (!base) return;
-    const bottomChrome = hasThumbs ? 170 : FIT_PADDING;
+    const horizontalPadding = isMobileOrTablet ? 0 : FIT_PADDING * 2;
+    const topChrome = isMobileOrTablet ? 56 : FIT_PADDING;
+    const bottomChrome = hasThumbs ? (isMobileOrTablet ? 110 : 170) : isMobileOrTablet ? 56 : FIT_PADDING;
     const fitScale = Math.min(
-      (window.innerWidth - FIT_PADDING * 2) / base.width,
-      (window.innerHeight - FIT_PADDING - bottomChrome) / base.height
+      (window.innerWidth - horizontalPadding) / base.width,
+      (window.innerHeight - topChrome - bottomChrome) / base.height
     );
     const clamped = Math.min(Math.max(fitScale, MIN_SCALE), MAX_SCALE);
     initialScaleRef.current = clamped;
     setScale(clamped);
-  }, [base, hasThumbs]);
+  }, [base, hasThumbs, isMobileOrTablet]);
 
   // Wheel zoom needs a native listener: React's root wheel listeners are
   // passive, so preventDefault via the synthetic event cannot stop page scroll.
@@ -281,10 +309,27 @@ function DiagramZoomOverlay({
 
   const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    // Don't intercept button clicks, toolbar, nav cluster, thumbnails, or save menu
+    if (
+      target.closest?.(
+        'button, [data-testid="diagram-overlay-topbar"], [data-testid="diagram-gallery-footer"], [data-testid="diagram-overlay-save-menu"], [data-testid="diagram-overlay-help-panel"]'
+      )
+    ) {
+      return;
+    }
+
     event.preventDefault();
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
     setIsPanning(true);
+
+    const isBackdropClick =
+      target === event.currentTarget || target.getAttribute('data-testid') === 'diagram-zoom-overlay';
 
     if (pointersRef.current.size === 1) {
       // Single pointer: pan; a touch pointer is also a swipe-to-navigate candidate.
@@ -296,6 +341,7 @@ function DiagramZoomOverlay({
         originX: translate.x,
         originY: translate.y,
         moved: false,
+        isBackdrop: isBackdropClick,
       };
     } else if (pointersRef.current.size === 2) {
       // Second finger lands: switch from swipe to pinch, anchored on the current view.
@@ -340,8 +386,12 @@ function DiagramZoomOverlay({
   const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!pointersRef.current.has(event.pointerId)) return;
     pointersRef.current.delete(event.pointerId);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    try {
+      if ((event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId)) {
+        (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      /* ignore */
     }
 
     // One finger lifted off a pinch: keep panning with the remaining finger.
@@ -358,20 +408,29 @@ function DiagramZoomOverlay({
           originX: translate.x,
           originY: translate.y,
           moved: false,
+          isBackdrop: false,
         };
       }
     }
 
-    // Swipe navigation: a horizontal touch flick at fit scale flips diagrams.
-    // Mouse drags and zoomed-in gestures keep panning — see SWIPE_THRESHOLD.
+    // Check tap on backdrop vs swipe navigation
     const swipe = swipeRef.current;
     if (swipe && swipe.pointerId === event.pointerId) {
       swipeRef.current = null;
       const deltaX = event.clientX - swipe.startX;
       const deltaY = event.clientY - swipe.startY;
+      const distance = Math.hypot(deltaX, deltaY);
       const atFitScale = scale <= initialScaleRef.current + 0.05;
-      const isHorizontalFlick = Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * 2;
-      if (swipe.pointerType === 'touch' && atFitScale && isHorizontalFlick) {
+      const isHorizontalFlick = Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * 1.5;
+
+      if (!swipe.moved && distance < DRAG_THRESHOLD && swipe.isBackdrop) {
+        // Tapped directly on backdrop without dragging -> close
+        onClose();
+        if (pointersRef.current.size === 0) setIsPanning(false);
+        return;
+      }
+
+      if ((swipe.pointerType === 'touch' || isSmallScreen) && atFitScale && isHorizontalFlick) {
         navigateBy(deltaX < 0 ? 1 : -1);
       }
     }
@@ -384,8 +443,18 @@ function DiagramZoomOverlay({
   // where the overlay root clips it. Without one, fall back to the natural SVG
   // layout with a transform scale.
   const contentStyle: React.CSSProperties = base
-    ? { width: base.width * scale, height: base.height * scale }
-    : { maxWidth: MAX_BOX_WIDTH, maxHeight: MAX_BOX_HEIGHT };
+    ? {
+        width: base.width * scale,
+        height: base.height * scale,
+        padding: isMobileOrTablet ? '0px' : '12px',
+        borderRadius: isMobileOrTablet ? '0px' : '8px',
+      }
+    : {
+        maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
+        maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
+        padding: isMobileOrTablet ? '0px' : '12px',
+        borderRadius: isMobileOrTablet ? '0px' : '8px',
+      };
   // Pan transforms the card itself: the overlay root is the fixed clip window,
   // so every part of an oversized diagram stays reachable by dragging.
   const diagramTransform = base
@@ -590,6 +659,10 @@ function DiagramZoomOverlay({
       role='dialog'
       aria-modal='true'
       aria-label={dialogAriaLabel}
+      onPointerDown={handlePanPointerDown}
+      onPointerMove={handlePanPointerMove}
+      onPointerUp={endPan}
+      onPointerCancel={endPan}
       onClick={(event: React.MouseEvent) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -602,6 +675,9 @@ function DiagramZoomOverlay({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
+        touchAction: 'none',
+        userSelect: 'none',
+        cursor: isPanning ? 'grabbing' : 'default',
       }}
     >
       {/* Top bar: the diagram title and the toolbar share one row — title on
@@ -613,14 +689,15 @@ function DiagramZoomOverlay({
         data-testid='diagram-overlay-topbar'
         style={{
           position: 'fixed',
-          top: 'calc(env(titlebar-area-height, 38px) + 12px)',
-          left: '16px',
-          right: '16px',
+          top: isMobileOrTablet ? '8px' : 'calc(env(titlebar-area-height, 38px) + 12px)',
+          left: isMobileOrTablet ? '8px' : '16px',
+          right: isMobileOrTablet ? '8px' : '16px',
           zIndex: 10001,
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          gap: '12px',
+          gap: isMobileOrTablet ? '6px' : '12px',
+          pointerEvents: 'none',
         }}
       >
         <div
@@ -639,7 +716,7 @@ function DiagramZoomOverlay({
             color: 'var(--text-secondary)',
             fontSize: '13px',
             lineHeight: '20px',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
             userSelect: 'none',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -664,6 +741,7 @@ function DiagramZoomOverlay({
             border: '1px solid var(--bg-3)',
             borderRadius: '8px',
             flexShrink: 0,
+            pointerEvents: 'auto',
           }}
         >
           <div
@@ -886,6 +964,7 @@ function DiagramZoomOverlay({
           alignItems: 'center',
           gap: '10px',
           maxWidth: '92vw',
+          pointerEvents: 'none',
         }}
       >
         {/* Nav cluster: prev / counter / next grouped in one compact pill, like
@@ -902,6 +981,7 @@ function DiagramZoomOverlay({
               background: 'var(--bg-2)',
               border: '1px solid var(--bg-3)',
               borderRadius: '8px',
+              pointerEvents: 'auto',
             }}
           >
             <button
@@ -950,6 +1030,7 @@ function DiagramZoomOverlay({
               maxWidth: 'min(72vw, 880px)',
               overflowX: 'auto',
               padding: '4px',
+              pointerEvents: 'auto',
             }}
           >
             {(items ?? []).map((item, index) => {

@@ -56,25 +56,59 @@ export const createDiagramGalleryValue = (
 });
 
 /**
- * Sorts diagram items by their actual order of appearance in the DOM.
+ * Recursively traverses the DOM document tree in physical depth-first order,
+ * including entering all Shadow DOM roots (e.g. Markdown ShadowView),
+ * to collect all diagram and image elements in strict reading order.
+ */
+export const queryAllDiagramElementsInDomOrder = (
+  root: Node = typeof document !== 'undefined' ? (document.body ?? document.documentElement) : (null as unknown as Node)
+): HTMLElement[] => {
+  if (typeof document === 'undefined' || !root) return [];
+  const results: HTMLElement[] = [];
+
+  const traverse = (node: Node) => {
+    if (node instanceof HTMLElement) {
+      if (node.hasAttribute('data-diagram-id')) {
+        results.push(node);
+      }
+      if (node.shadowRoot) {
+        traverse(node.shadowRoot);
+      }
+    }
+    const children = node.childNodes;
+    if (children) {
+      for (let i = 0; i < children.length; i++) {
+        traverse(children[i]);
+      }
+    }
+  };
+
+  traverse(root);
+  return results;
+};
+
+/**
+ * Sorts diagram items by their actual order of appearance in the DOM across all messages and shadow roots.
  * This guarantees items in the gallery strictly follow the top-to-bottom stream
  * regardless of async rendering completion timings (e.g. sync SVG vs async Mermaid).
  */
 export const sortDiagramItemsByDomOrder = (items: DiagramItem[]): DiagramItem[] => {
   if (typeof document === 'undefined' || items.length <= 1) return items;
-  return [...items].sort((a, b) => {
-    const elA = document.querySelector(`[data-diagram-id="${a.id}"]`) || document.getElementById(a.id);
-    const elB = document.querySelector(`[data-diagram-id="${b.id}"]`) || document.getElementById(b.id);
-    if (!elA || !elB) return 0;
-    if (elA === elB) return 0;
-    const position = elA.compareDocumentPosition(elB);
-    if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
-      return -1; // a comes before b in DOM
+  const elements = queryAllDiagramElementsInDomOrder();
+  if (elements.length === 0) return items;
+
+  const idOrderMap = new Map<string, number>();
+  elements.forEach((el, index) => {
+    const id = el.getAttribute('data-diagram-id');
+    if (id && !idOrderMap.has(id)) {
+      idOrderMap.set(id, index);
     }
-    if (position & Node.DOCUMENT_POSITION_PRECEDING) {
-      return 1; // a comes after b in DOM
-    }
-    return 0;
+  });
+
+  return [...items].toSorted((a, b) => {
+    const orderA = idOrderMap.has(a.id) ? idOrderMap.get(a.id)! : Number.MAX_SAFE_INTEGER;
+    const orderB = idOrderMap.has(b.id) ? idOrderMap.get(b.id)! : Number.MAX_SAFE_INTEGER;
+    return orderA - orderB;
   });
 };
 

@@ -546,4 +546,39 @@ describe('DiagramGalleryContext', () => {
     expect(screen.queryByTestId('diagram-gallery-prev')).toBeNull();
     expect(screen.queryByTestId('diagram-gallery-counter')).toBeNull();
   });
+
+  it('traverses shadow roots and sorts diagram items in physical DOM order', async () => {
+    const { queryAllDiagramElementsInDomOrder, sortDiagramItemsByDomOrder } =
+      await import('@/renderer/components/Markdown/diagrams/DiagramGalleryContext');
+
+    const host1 = document.createElement('div');
+    const shadow1 = host1.attachShadow({ mode: 'open' });
+    const item1El = document.createElement('div');
+    item1El.setAttribute('data-diagram-id', 'diagram-1');
+    shadow1.appendChild(item1El);
+
+    const host2 = document.createElement('div');
+    const shadow2 = host2.attachShadow({ mode: 'open' });
+    const item2El = document.createElement('div');
+    item2El.setAttribute('data-diagram-id', 'diagram-2');
+    shadow2.appendChild(item2El);
+
+    document.body.appendChild(host1);
+    document.body.appendChild(host2);
+
+    try {
+      const found = queryAllDiagramElementsInDomOrder();
+      expect(found.map((el) => el.getAttribute('data-diagram-id'))).toEqual(['diagram-1', 'diagram-2']);
+
+      const items = [
+        { id: 'diagram-2', svg: '<svg></svg>' },
+        { id: 'diagram-1', svg: '<svg></svg>' },
+      ];
+      const sorted = sortDiagramItemsByDomOrder(items);
+      expect(sorted.map((i) => i.id)).toEqual(['diagram-1', 'diagram-2']);
+    } finally {
+      host1.remove();
+      host2.remove();
+    }
+  });
 });

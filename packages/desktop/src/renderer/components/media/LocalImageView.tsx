@@ -64,7 +64,12 @@ const LocalImageView: React.FC<{
       });
   }, [absolutePath, src, root]);
 
-  const snapshotSvg = useMemo(() => (!loading && url ? buildImageSnapshotSvg(url) : ''), [loading, url]);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  const snapshotSvg = useMemo(
+    () => (!loading && url ? buildImageSnapshotSvg(url, dimensions?.width || 800, dimensions?.height || 600) : ''),
+    [loading, url, dimensions]
+  );
   const galleryItem = useMemo(
     () =>
       enableGallery && snapshotSvg
@@ -104,6 +109,12 @@ const LocalImageView: React.FC<{
         className={className}
         style={{ cursor: enableGallery ? 'pointer' : 'default', maxWidth: '100%' }}
         onClick={enableGallery ? () => gallery.openGallery(cleanId) : undefined}
+        onLoad={(e) => {
+          const img = e.currentTarget;
+          if (img.naturalWidth && img.naturalHeight) {
+            setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+          }
+        }}
         title={alt || undefined}
       />
       {gallery.localOpen && galleryItem && (
