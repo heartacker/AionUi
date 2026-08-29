@@ -154,6 +154,20 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
     setActiveId(id);
   }, []);
 
+  const closeGallery = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const swallow = (e: MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+      };
+      window.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => {
+        window.removeEventListener('click', swallow, { capture: true });
+      }, 350);
+    }
+    setActiveId(null);
+  }, []);
+
   const value = useMemo(
     () => createDiagramGalleryValue(items, activeId, { registerDiagram, unregisterDiagram, openGallery }),
     [items, activeId, registerDiagram, unregisterDiagram, openGallery]
@@ -165,12 +179,7 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
     <DiagramGalleryContext.Provider value={value}>
       {children}
       {activeItem && (
-        <DiagramZoomOverlay
-          items={items}
-          activeId={activeItem.id}
-          onNavigate={openGallery}
-          onClose={() => setActiveId(null)}
-        />
+        <DiagramZoomOverlay items={items} activeId={activeItem.id} onNavigate={openGallery} onClose={closeGallery} />
       )}
     </DiagramGalleryContext.Provider>
   );
