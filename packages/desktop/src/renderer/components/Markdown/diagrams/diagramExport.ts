@@ -625,11 +625,8 @@ export const prepareDiagramSvgForExport = async (
 
   if (item.type === 'math') {
     try {
-      const { renderKatexToPureSvg } = await import('./mathExport');
-      const pureSvg = renderKatexToPureSvg(item.code, targetTheme);
-      if (pureSvg) {
-        return pureSvg;
-      }
+      const { prepareMathSvgForExport } = await import('./mathExport');
+      return await prepareMathSvgForExport(svg, targetTheme, item.code);
     } catch (e) {
       console.warn('[prepareDiagramSvgForExport] math re-render failed:', e);
       return svg;

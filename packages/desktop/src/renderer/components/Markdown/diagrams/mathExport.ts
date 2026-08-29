@@ -41,15 +41,16 @@ export const renderKatexToPureSvg = (
     let jsdomCursorX = padding;
 
     // 1. Process all horizontal rule / fraction lines
-    const lineElements = div.querySelectorAll<HTMLElement>('.frac-line, .rule, .hline, .stretchy');
+    const lineElements = div.querySelectorAll<HTMLElement>('.frac-line, .rule, .hline, .stretchy, hr');
     const processedElements = new Set<Element>();
 
     for (const el of Array.from(lineElements)) {
       const rect = el.getBoundingClientRect();
-      if (!isZeroRectEnv && rect.width > 0 && rect.height > 0) {
+      if (!isZeroRectEnv && rect.width > 0) {
         const x = rect.left - (baseRect.left - padding);
         const y = rect.top - (baseRect.top - padding);
-        const h = Math.max(1, rect.height);
+        const style = window.getComputedStyle(el);
+        const h = Math.max(1, parseFloat(style.borderBottomWidth) || parseFloat(style.height) || rect.height || 1.5);
         svgElements.push(
           `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${rect.width.toFixed(2)}" height="${h.toFixed(2)}" fill="${fillColor}" stroke="none"/>`
         );
@@ -65,14 +66,18 @@ export const renderKatexToPureSvg = (
       const x = isZeroRectEnv ? jsdomCursorX : rect.left - (baseRect.left - padding);
       const y = isZeroRectEnv ? padding : rect.top - (baseRect.top - padding);
       const viewBox = svg.getAttribute('viewBox') || `0 0 ${rect.width || 20} ${rect.height || 20}`;
+      const preserveAspectRatio = svg.getAttribute('preserveAspectRatio') || 'xMidYMid meet';
       const pathMarkup = Array.from(paths)
-        .map((p) => `<path d="${p.getAttribute('d')}" fill="${fillColor}" stroke="none"/>`)
+        .map((p) => {
+          const d = p.getAttribute('d');
+          return d ? `<path d="${d}" fill="${fillColor}" stroke="none"/>` : '';
+        })
         .join('');
       if (pathMarkup) {
         const w = (rect.width || 20).toFixed(2);
         const h = (rect.height || 20).toFixed(2);
         svgElements.push(
-          `<g transform="translate(${x}, ${y})"><svg width="${w}" height="${h}" viewBox="${viewBox}">${pathMarkup}</svg></g>`
+          `<g transform="translate(${x}, ${y})"><svg width="${w}" height="${h}" viewBox="${viewBox}" preserveAspectRatio="${preserveAspectRatio}">${pathMarkup}</svg></g>`
         );
         if (isZeroRectEnv) jsdomCursorX += 24;
       }
@@ -83,13 +88,14 @@ export const renderKatexToPureSvg = (
     const walker = document.createTreeWalker(katexEl, NodeFilter.SHOW_TEXT);
     let textNode: Node | null;
     while ((textNode = walker.nextNode())) {
-      const text = textNode.textContent?.trim();
+      const rawText = textNode.textContent || '';
+      const text = rawText.replace(/\u200B/g, '').trim();
       if (!text) continue;
       const parent = textNode.parentElement;
       if (!parent || processedElements.has(parent) || parent.closest('svg')) continue;
 
-      // Skip invisible MathML annotations
-      if (parent.closest('.katex-mathml')) continue;
+      // Skip invisible MathML annotations and strut spacers
+      if (parent.closest('.katex-mathml') || parent.closest('.vlist-s') || parent.closest('.pstrut')) continue;
 
       const rect = parent.getBoundingClientRect();
       if (!isZeroRectEnv && (rect.width <= 0 || rect.height <= 0)) continue;
@@ -108,14 +114,22 @@ export const renderKatexToPureSvg = (
         y = (padding + parentFontSize).toFixed(2);
         jsdomCursorX += Math.max(8, text.length * parentFontSize * 0.6);
       } else {
-        x = (rect.left - (baseRect.left - padding)).toFixed(2);
-        y = (rect.top - (baseRect.top - padding) + rect.height * 0.82).toFixed(2);
+        const centerX = rect.left - (baseRect.left - padding) + rect.width / 2;
+        const centerY = rect.top - (baseRect.top - padding) + rect.height / 2;
+        x = centerX.toFixed(2);
+        y = centerY.toFixed(2);
       }
 
       const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      svgElements.push(
-        `<text x="${x}" y="${y}" font-family="${fontFamily}" font-size="${parentFontSize}px" font-style="${fontStyle}" font-weight="${fontWeight}" fill="${fillColor}" stroke="none">${escaped}</text>`
-      );
+      if (isZeroRectEnv) {
+        svgElements.push(
+          `<text x="${x}" y="${y}" font-family="${fontFamily}" font-size="${parentFontSize}px" font-style="${fontStyle}" font-weight="${fontWeight}" fill="${fillColor}" stroke="none">${escaped}</text>`
+        );
+      } else {
+        svgElements.push(
+          `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-family="${fontFamily}" font-size="${parentFontSize}px" font-style="${fontStyle}" font-weight="${fontWeight}" fill="${fillColor}" stroke="none">${escaped}</text>`
+        );
+      }
     }
 
     const width = isZeroRectEnv
@@ -274,14 +288,7 @@ export const prepareMathSvgForExport = async (
   targetTheme: 'light' | 'dark' = 'light',
   code?: string
 ): Promise<string> => {
-  if (code) {
-    try {
-      const pureSvg = renderKatexToPureSvg(code, targetTheme);
-      if (pureSvg) return pureSvg;
-    } catch (err) {
-      console.warn('[MathExport] renderKatexToPureSvg failed, falling back:', err);
-    }
-  }
+  let inlinedFontCss = '';
   if (!exportCssPromise) {
     exportCssPromise = (async () => {
       try {
@@ -295,11 +302,33 @@ export const prepareMathSvgForExport = async (
     })();
   }
   try {
-    const css = await exportCssPromise;
+    inlinedFontCss = await exportCssPromise;
+  } catch (err) {
+    console.warn('[MathExport] inlinedFontCss error:', err);
+  }
+
+  if (code) {
+    try {
+      const pureSvg = renderKatexToPureSvg(code, targetTheme);
+      if (pureSvg) {
+        if (inlinedFontCss) {
+          return pureSvg.replace(
+            /<svg\b([^>]*)>/i,
+            (_match, attrs: string) => `<svg${attrs}><defs><style>${inlinedFontCss}</style></defs>`
+          );
+        }
+        return pureSvg;
+      }
+    } catch (err) {
+      console.warn('[MathExport] renderKatexToPureSvg failed, falling back:', err);
+    }
+  }
+
+  try {
     const formulaColor = targetTheme === 'dark' ? '#e5e6eb' : MATH_EXPORT_COLOR;
     const withColor = svg.replace(/(style="[^"]*color:\s*)([^;"]+)/i, `$1${formulaColor}`);
-    const themedCss = css
-      ? `${css}\n.katex { color: ${formulaColor} !important; }`
+    const themedCss = inlinedFontCss
+      ? `${inlinedFontCss}\n.katex { color: ${formulaColor} !important; }`
       : `.katex { color: ${formulaColor} !important; }`;
     return withColor.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => `<svg${attrs}><style>${themedCss}</style>`);
   } catch (err) {
