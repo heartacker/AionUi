@@ -276,11 +276,18 @@ export const parseDrawioPages = async (rawContent: string): Promise<DrawioParseR
   }
 };
 
+export const DEFAULT_DRAWIO_VIEWER_URL = 'https://viewer.diagrams.net';
+export const DEFAULT_DRAWIO_APP_URL = 'https://app.diagrams.net';
+
 /**
- * Build the embed viewer URL for Diagrams.net iframe.
+ * Build the embed viewer URL for Diagrams.net / Draw.io iframe.
  */
-export const buildDrawioViewerUrl = (options: { page?: number; theme?: 'light' | 'dark' } = {}): string => {
-  const { page = 0, theme = 'light' } = options;
+export const buildDrawioViewerUrl = (
+  options: { page?: number; theme?: 'light' | 'dark'; baseUrl?: string } = {}
+): string => {
+  const { page = 0, theme = 'light', baseUrl } = options;
+  const rawBase = (baseUrl || '').trim() || DEFAULT_DRAWIO_VIEWER_URL;
+  const baseWithoutSlash = rawBase.replace(/\/+$/, '');
   const darkParam = theme === 'dark' ? '&dark=1' : '';
-  return `https://viewer.diagrams.net/?embed=1&proto=json&spin=1&highlight=0000ff&edit=_blank&nav=1&layers=1&page=${page}${darkParam}`;
+  return `${baseWithoutSlash}/?embed=1&proto=json&spin=1&highlight=0000ff&edit=_blank&nav=1&layers=1&page=${page}${darkParam}`;
 };

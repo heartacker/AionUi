@@ -110,5 +110,15 @@ describe('drawioUtils', () => {
       expect(url).toContain('page=2');
       expect(url).toContain('&dark=1');
     });
+
+    it('builds viewer URL with custom self-hosted baseUrl', () => {
+      const url = buildDrawioViewerUrl({
+        page: 1,
+        theme: 'light',
+        baseUrl: 'https://drawio.internal.mycompany.com/',
+      });
+      expect(url).toContain('https://drawio.internal.mycompany.com/?embed=1');
+      expect(url).toContain('page=1');
+    });
   });
 });

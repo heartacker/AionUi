@@ -1416,5 +1416,7 @@
   "crossSessionMessageDesc": "允許 Agent 向你的其他對話傳送訊息。關閉後，輸入框的 @@ 對話提及與投遞功能會同時停用。",
   "crossSessionMessageDisabledBanner": "跨對話訊息已關閉，輸入框的 @@ 對話提及不可用。",
   "crossSessionMessageResume": "重新開啟",
-  "crossSessionMessageUpdateFailed": "跨對話訊息設定更新失敗"
+  "crossSessionMessageUpdateFailed": "跨對話訊息設定更新失敗",
+  "previewDrawioUrl": "Draw.io 服務位址",
+  "previewDrawioUrlDesc": "設定自訂或自建私有化 Draw.io 網址，留空則預設使用官方服務 (https://viewer.diagrams.net)。"
 }

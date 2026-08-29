@@ -20,7 +20,7 @@ import {
 } from '@/renderer/utils/file/previewPayload';
 import { notifyManualRestartRequired } from '@/renderer/utils/appRestart';
 import { isElectronDesktop } from '@/renderer/utils/platform';
-import { Alert, Collapse, Form, InputNumber, Message, Modal, Switch } from '@arco-design/web-react';
+import { Alert, Collapse, Form, Input, InputNumber, Message, Modal, Switch } from '@arco-design/web-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
@@ -74,6 +74,8 @@ const SystemModalContent: React.FC = () => {
    */
   const [previewLimitMb, setPreviewLimitMb] = useState<number>(DEFAULT_TEXT_PREVIEW_LIMIT_MB);
   const previewLimitDraftRef = useRef<string>(String(DEFAULT_TEXT_PREVIEW_LIMIT_MB));
+  const [drawioUrl, setDrawioUrl] = useState<string>('');
+  const drawioUrlDraftRef = useRef<string>('');
   const [saveUploadToWorkspace, setSaveUploadToWorkspace] = useState(false);
 
   useEffect(() => {
@@ -121,10 +123,11 @@ const SystemModalContent: React.FC = () => {
 
     const loadAcpTimeouts = async () => {
       try {
-        const [storedPromptTimeout, storedAgentIdleTimeout, storedPreviewLimitMb] = await Promise.all([
+        const [storedPromptTimeout, storedAgentIdleTimeout, storedPreviewLimitMb, storedDrawioUrl] = await Promise.all([
           getClientBusinessSetting('acp.promptTimeout'),
           getClientBusinessSetting('acp.agentIdleTimeout'),
           getClientBusinessSetting('preview.textSizeLimitMb'),
+          getClientBusinessSetting('preview.drawioUrl'),
         ]);
         if (cancelled) {
           return;
@@ -143,6 +146,10 @@ const SystemModalContent: React.FC = () => {
           const stored = normalizeTextPreviewLimitMb(storedPreviewLimitMb);
           setPreviewLimitMb(stored);
           previewLimitDraftRef.current = String(stored);
+        }
+        if (storedDrawioUrl) {
+          setDrawioUrl(storedDrawioUrl);
+          drawioUrlDraftRef.current = storedDrawioUrl;
         }
       } catch {
         // Keep the in-memory defaults when backend settings are unavailable.
@@ -316,6 +323,16 @@ const SystemModalContent: React.FC = () => {
     void setClientBusinessSetting('preview.textSizeLimitMb', clamped).catch(() => {});
   }, []);
 
+  const handleDrawioUrlChange = useCallback((val: string) => {
+    drawioUrlDraftRef.current = val;
+    setDrawioUrl(val);
+  }, []);
+
+  const handleDrawioUrlBlur = useCallback(() => {
+    const typed = drawioUrlDraftRef.current.trim();
+    void setClientBusinessSetting('preview.drawioUrl', typed || undefined).catch(() => {});
+  }, []);
+
   // Cross-session messaging master switch. Unlike its neighbours this one is a
   // typed column on `system_settings`, so it goes through `PATCH /api/settings`
   // (the hook owns that call); `changeLanguage` on this same page is the
@@ -433,6 +450,21 @@ const SystemModalContent: React.FC = () => {
           step={0.5}
           style={{ width: 120 }}
           suffix='MB'
+        />
+      ),
+    },
+    {
+      key: 'previewDrawioUrl',
+      label: t('settings.previewDrawioUrl'),
+      description: t('settings.previewDrawioUrlDesc'),
+      component: (
+        <Input
+          value={drawioUrl}
+          placeholder='https://viewer.diagrams.net'
+          onChange={handleDrawioUrlChange}
+          onBlur={handleDrawioUrlBlur}
+          allowClear
+          style={{ width: 260 }}
         />
       ),
     },
