@@ -48,13 +48,13 @@ describe('DrawioViewer', () => {
   const sampleXml =
     '<mxfile><diagram id="p1" name="Page-1"><mxGraphModel><root><mxCell id="0"/></root></mxGraphModel></diagram></mxfile>';
 
-  it('renders iframe with diagrams.net viewer URL', async () => {
+  it('renders iframe with diagrams.net editor URL by default', async () => {
     await act(async () => {
       render(<DrawioViewer content={sampleXml} file_path='/path/to/test.drawio' />);
     });
     const iframe = screen.getByTitle('Draw.io Viewer') as HTMLIFrameElement;
     expect(iframe).toBeTruthy();
-    expect(iframe.src).toContain('https://viewer.diagrams.net/');
+    expect(iframe.src).toContain('https://embed.diagrams.net/');
   });
 
   it('posts load message to iframe when receiving init event', async () => {

@@ -80,7 +80,16 @@ export const EXTENSION_MAP: Record<string, FileTypeInfo> = {
  */
 export const getFileTypeInfo = (file_name: string): FileTypeInfo => {
   const lowerName = file_name.toLowerCase();
-  if (lowerName.endsWith('.drawio.xml') || lowerName.endsWith('.dio.xml')) {
+  if (
+    lowerName.endsWith('.drawio.xml') ||
+    lowerName.endsWith('.dio.xml') ||
+    lowerName.endsWith('.drawio.png') ||
+    lowerName.endsWith('.dio.png') ||
+    lowerName.endsWith('.drawio.svg') ||
+    lowerName.endsWith('.dio.svg') ||
+    lowerName.endsWith('.drawio.pdf') ||
+    lowerName.endsWith('.dio.pdf')
+  ) {
     return { contentType: 'drawio', editable: true, language: 'xml' };
   }
   const ext = lowerName.split('.').pop() || '';

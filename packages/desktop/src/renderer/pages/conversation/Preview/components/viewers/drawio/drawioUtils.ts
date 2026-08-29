@@ -33,7 +33,9 @@ export const isDrawioFile = (fileName: string): boolean => {
     lower.endsWith('.drawio.svg') ||
     lower.endsWith('.dio.svg') ||
     lower.endsWith('.drawio.png') ||
-    lower.endsWith('.dio.png')
+    lower.endsWith('.dio.png') ||
+    lower.endsWith('.drawio.pdf') ||
+    lower.endsWith('.dio.pdf')
   );
 };
 
@@ -139,6 +141,135 @@ export const extractDrawioXmlFromSvg = (svgContent: string): string | null => {
 };
 
 /**
+ * Extract embedded mxfile XML from a PNG data URL or binary byte array (tEXt chunk).
+ */
+export const extractDrawioXmlFromPng = (input: string | Uint8Array): string | null => {
+  if (!input) return null;
+  let bytes: Uint8Array;
+
+  if (typeof input === 'string') {
+    let b64 = input.trim();
+    if (b64.startsWith('data:')) {
+      const idx = b64.indexOf('base64,');
+      if (idx === -1) return null;
+      b64 = b64.substring(idx + 7);
+    }
+    try {
+      if (typeof atob === 'function') {
+        const binStr = atob(b64);
+        bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) {
+          bytes[i] = binStr.charCodeAt(i);
+        }
+      } else if (typeof Buffer !== 'undefined') {
+        bytes = new Uint8Array(Buffer.from(b64, 'base64'));
+      } else {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+  } else {
+    bytes = input;
+  }
+
+  // Verify PNG header signature: 137 80 78 71 13 10 26 10
+  if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) {
+    return null;
+  }
+
+  let offset = 8;
+  const textDecoder = new TextDecoder('utf-8');
+
+  while (offset + 8 <= bytes.length) {
+    const length = (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
+    const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+
+    if (dataEnd > bytes.length || length < 0) break;
+
+    if (type === 'tEXt' || type === 'iTXt' || type === 'zTXt') {
+      const chunkData = bytes.subarray(dataStart, dataEnd);
+      let nullIndex = -1;
+      for (let i = 0; i < chunkData.length; i++) {
+        if (chunkData[i] === 0) {
+          nullIndex = i;
+          break;
+        }
+      }
+
+      if (nullIndex > 0) {
+        const keyword = textDecoder.decode(chunkData.subarray(0, nullIndex)).trim();
+        if (keyword === 'mxfile' || keyword === 'mxGraphModel' || keyword === 'diagram') {
+          if (type === 'tEXt') {
+            const rawText = textDecoder.decode(chunkData.subarray(nullIndex + 1));
+            try {
+              return decodeURIComponent(rawText);
+            } catch {
+              return rawText;
+            }
+          }
+        }
+      }
+    }
+
+    offset = dataEnd + 4;
+  }
+
+  return null;
+};
+
+/**
+ * Extract embedded mxfile XML from a PDF document string or data URL (/Subject metadata).
+ */
+export const extractDrawioXmlFromPdf = (input: string): string | null => {
+  if (!input) return null;
+  let text = input.trim();
+  if (text.startsWith('data:')) {
+    const idx = text.indexOf('base64,');
+    if (idx !== -1) {
+      try {
+        if (typeof atob === 'function') {
+          text = atob(text.substring(idx + 7));
+        } else if (typeof Buffer !== 'undefined') {
+          text = Buffer.from(text.substring(idx + 7), 'base64').toString('utf-8');
+        }
+      } catch {
+        // keep text as is
+      }
+    }
+  }
+
+  // Search for /Subject (...) in PDF header
+  const subjectMatch = text.match(/\/Subject\s*\(([^)]+)\)/);
+  if (subjectMatch && subjectMatch[1]) {
+    const raw = subjectMatch[1];
+    try {
+      const decoded = decodeURIComponent(raw);
+      if (decoded.includes('<mxfile') || decoded.includes('<mxGraphModel')) {
+        return decoded;
+      }
+    } catch {
+      if (raw.includes('<mxfile') || raw.includes('<mxGraphModel')) {
+        return raw;
+      }
+    }
+  }
+
+  // Search for raw <mxfile> XML tag embedded in PDF text stream
+  const mxfileIndex = text.indexOf('<mxfile');
+  if (mxfileIndex !== -1) {
+    const mxfileEnd = text.indexOf('</mxfile>', mxfileIndex);
+    if (mxfileEnd !== -1) {
+      return text.substring(mxfileIndex, mxfileEnd + 9);
+    }
+  }
+
+  return null;
+};
+
+/**
  * Parse Draw.io document content and extract all pages (uncompressed).
  */
 export const parseDrawioPages = async (rawContent: string): Promise<DrawioParseResult> => {
@@ -147,11 +278,24 @@ export const parseDrawioPages = async (rawContent: string): Promise<DrawioParseR
     return { isValid: false, isSvg: false, pages: [], rawXml: '' };
   }
 
-  // Check if content is SVG
+  // Check if content is SVG, PNG, or PDF with embedded diagram
   const isSvg = content.startsWith('<svg') || content.includes('xmlns="http://www.w3.org/2000/svg"');
+  const isPng = content.startsWith('data:image/png') || content.startsWith('iVBORw0KGgo');
+  const isPdf = content.startsWith('data:application/pdf') || content.startsWith('%PDF');
+
   let xmlToParse = content;
   if (isSvg) {
     const embeddedXml = extractDrawioXmlFromSvg(content);
+    if (embeddedXml) {
+      xmlToParse = embeddedXml;
+    }
+  } else if (isPng) {
+    const embeddedXml = extractDrawioXmlFromPng(content);
+    if (embeddedXml) {
+      xmlToParse = embeddedXml;
+    }
+  } else if (isPdf) {
+    const embeddedXml = extractDrawioXmlFromPdf(content);
     if (embeddedXml) {
       xmlToParse = embeddedXml;
     }
@@ -277,17 +421,44 @@ export const parseDrawioPages = async (rawContent: string): Promise<DrawioParseR
 };
 
 export const DEFAULT_DRAWIO_VIEWER_URL = 'https://viewer.diagrams.net';
+export const DEFAULT_DRAWIO_EMBED_URL = 'https://embed.diagrams.net';
 export const DEFAULT_DRAWIO_APP_URL = 'https://app.diagrams.net';
 
+export type DrawioMode = 'view' | 'edit';
+
 /**
- * Build the embed viewer URL for Diagrams.net / Draw.io iframe.
+ * Resolve Draw.io base URL supporting absolute, relative (/drawio), or default fallback.
+ */
+export const resolveDrawioBaseUrl = (customUrl?: string, defaultUrl: string = DEFAULT_DRAWIO_VIEWER_URL): string => {
+  const trimmed = (customUrl || '').trim();
+  if (trimmed) {
+    if (trimmed.startsWith('/') && typeof window !== 'undefined' && window.location?.origin) {
+      return `${window.location.origin}${trimmed.replace(/\/+$/, '')}`;
+    }
+    return trimmed.replace(/\/+$/, '');
+  }
+  return defaultUrl;
+};
+
+/**
+ * Build the embed iframe URL for Draw.io (supporting both 'edit' and 'view' modes).
  */
 export const buildDrawioViewerUrl = (
-  options: { page?: number; theme?: 'light' | 'dark'; baseUrl?: string } = {}
+  options: {
+    mode?: DrawioMode;
+    page?: number;
+    theme?: 'light' | 'dark';
+    baseUrl?: string;
+  } = {}
 ): string => {
-  const { page = 0, theme = 'light', baseUrl } = options;
-  const rawBase = (baseUrl || '').trim() || DEFAULT_DRAWIO_VIEWER_URL;
-  const baseWithoutSlash = rawBase.replace(/\/+$/, '');
+  const { mode = 'edit', page = 0, theme = 'light', baseUrl } = options;
   const darkParam = theme === 'dark' ? '&dark=1' : '';
-  return `${baseWithoutSlash}/?embed=1&proto=json&spin=1&highlight=0000ff&edit=_blank&nav=1&layers=1&page=${page}${darkParam}`;
+
+  if (mode === 'edit') {
+    const resolvedBase = resolveDrawioBaseUrl(baseUrl, DEFAULT_DRAWIO_EMBED_URL);
+    return `${resolvedBase}/?embed=1&proto=json&spin=1&configure=1&noSaveBtn=0&saveAndExit=0&noExitBtn=1&page=${page}${darkParam}`;
+  }
+
+  const resolvedBase = resolveDrawioBaseUrl(baseUrl, DEFAULT_DRAWIO_VIEWER_URL);
+  return `${resolvedBase}/?embed=1&proto=json&spin=1&highlight=0000ff&edit=_blank&nav=1&layers=1&page=${page}${darkParam}`;
 };

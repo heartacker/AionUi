@@ -90,7 +90,16 @@ export const getFileExtension = (file_path: string): string => {
  */
 export const getContentTypeByExtension = (file_path: string): PreviewContentType => {
   const lowerPath = (file_path || '').toLowerCase();
-  if (lowerPath.endsWith('.drawio.xml') || lowerPath.endsWith('.dio.xml')) {
+  if (
+    lowerPath.endsWith('.drawio.xml') ||
+    lowerPath.endsWith('.dio.xml') ||
+    lowerPath.endsWith('.drawio.png') ||
+    lowerPath.endsWith('.dio.png') ||
+    lowerPath.endsWith('.drawio.svg') ||
+    lowerPath.endsWith('.dio.svg') ||
+    lowerPath.endsWith('.drawio.pdf') ||
+    lowerPath.endsWith('.dio.pdf')
+  ) {
     return 'drawio';
   }
 

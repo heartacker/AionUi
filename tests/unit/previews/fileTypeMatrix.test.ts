@@ -114,9 +114,13 @@ describe('unchanged mappings still hold', () => {
     ['diagram.drawio', 'drawio'],
     ['flow.dio', 'drawio'],
     ['model.drawio.xml', 'drawio'],
+    ['chart.drawio.png', 'drawio'],
+    ['doc.drawio.pdf', 'drawio'],
+    ['vector.drawio.svg', 'drawio'],
     ['noextension', 'code'],
   ] as const)('%s → %s', (name, expected) => {
     expect(getContentTypeByExtension(name)).toBe(expected);
+    expect(getFileTypeInfo(name).contentType).toBe(expected);
   });
 });
 

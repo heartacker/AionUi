@@ -209,5 +209,10 @@
     "zoomIn": "拡大",
     "zoomOut": "縮小",
     "openInApp": "Diagrams.net で開く"
-  }
+  },
+  "drawio.editMode": "ビジュアル編集",
+  "drawio.viewMode": "プレビュー",
+  "drawio.switchToView": "プレビューモードに切り替え",
+  "drawio.switchToEdit": "ビジュアル編集モードに切り替え",
+  "drawio.saveSuccess": "Draw.io ダイアグラムを保存しました"
 }

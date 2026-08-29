@@ -7,13 +7,20 @@
 import { ipcBridge } from '@/common';
 import type { ChatFileRef } from '@/common/types/chatFile';
 import { Button, Dropdown, Menu, Message, Spin, Tooltip } from '@arco-design/web-react';
-import { Down, FullScreenOne, LinkOne, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
+import { Down, EditOne, FullScreenOne, LinkOne, PreviewOpen, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePreviewToolbarExtras } from '../../../context/PreviewToolbarExtrasContext';
 import { useThemeDetection } from '../../../hooks';
 import { getClientBusinessSetting } from '@/renderer/services/clientBusinessSettings';
-import { buildDrawioViewerUrl, DEFAULT_DRAWIO_APP_URL, type DrawioPage, parseDrawioPages } from './drawioUtils';
+import {
+  buildDrawioViewerUrl,
+  DEFAULT_DRAWIO_APP_URL,
+  type DrawioMode,
+  type DrawioPage,
+  parseDrawioPages,
+  resolveDrawioBaseUrl,
+} from './drawioUtils';
 
 export interface DrawioViewerProps {
   content: string;
@@ -28,7 +35,13 @@ export interface DrawioViewerProps {
 
 const LOAD_TIMEOUT_MS = 10000;
 
-export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, fileRef, hideToolbar = false }) => {
+export const DrawioViewer: React.FC<DrawioViewerProps> = ({
+  content,
+  file_path,
+  fileRef,
+  onContentChange,
+  hideToolbar = false,
+}) => {
   const { t } = useTranslation();
   const currentTheme = useThemeDetection();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -36,6 +49,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pages, setPages] = useState<DrawioPage[]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [drawioMode, setDrawioMode] = useState<DrawioMode>('edit');
   const [customDrawioUrl, setCustomDrawioUrl] = useState<string | undefined>();
   const [iframeKey, setIframeKey] = useState(0);
   const [messageApi, messageContextHolder] = Message.useMessage();
@@ -74,7 +88,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
     };
   }, [content, activePageIndex]);
 
-  // Handle postMessage communication with Diagrams.net viewer iframe
+  // Handle postMessage communication with Diagrams.net / Draw.io iframe
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -98,7 +112,21 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
         }
       }
 
-      if (data.event === 'init') {
+      if (data.event === 'configure') {
+        const iframeWin = iframeRef.current?.contentWindow;
+        if (iframeWin) {
+          iframeWin.postMessage(
+            JSON.stringify({
+              action: 'configure',
+              config: {
+                defaultFonts: ['Helvetica', 'Arial', 'sans-serif'],
+                compressXml: false,
+              },
+            }),
+            '*'
+          );
+        }
+      } else if (data.event === 'init') {
         if (timeoutId) {
           clearTimeout(timeoutId);
           timeoutId = null;
@@ -114,7 +142,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
               action: 'load',
               xml: content,
               page: activePageIndex,
-              autosave: 0,
+              autosave: drawioMode === 'edit' ? 1 : 0,
             }),
             '*'
           );
@@ -126,6 +154,15 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
         }
         setLoading(false);
         setLoadError(null);
+      } else if (data.event === 'save') {
+        if (data.xml && typeof data.xml === 'string' && onContentChange) {
+          onContentChange(data.xml);
+          messageApi.success(t('preview.drawio.saveSuccess', { defaultValue: 'Diagram saved' }));
+        }
+      } else if (data.event === 'autosave') {
+        if (data.xml && typeof data.xml === 'string' && onContentChange) {
+          onContentChange(data.xml);
+        }
       }
     };
 
@@ -137,7 +174,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
       }
       window.removeEventListener('message', handleMessage);
     };
-  }, [content, activePageIndex, iframeKey, t]);
+  }, [content, activePageIndex, iframeKey, drawioMode, onContentChange, messageApi, t]);
 
   // Page switcher
   const handlePageSelect = useCallback(
@@ -196,18 +233,20 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
 
   // Open in Diagrams.net online or custom Draw.io web app
   const handleOpenDiagramsNet = useCallback(() => {
-    const targetUrl = (customDrawioUrl || '').trim() || DEFAULT_DRAWIO_APP_URL;
+    const customResolved = customDrawioUrl ? resolveDrawioBaseUrl(customDrawioUrl) : '';
+    const targetUrl = customResolved || DEFAULT_DRAWIO_APP_URL;
     window.open(targetUrl, '_blank');
   }, [customDrawioUrl]);
 
   // Viewer iframe URL
   const viewerUrl = useMemo(() => {
     return buildDrawioViewerUrl({
+      mode: drawioMode,
       page: activePageIndex,
       theme: currentTheme === 'dark' ? 'dark' : 'light',
       baseUrl: customDrawioUrl,
     });
-  }, [activePageIndex, currentTheme, customDrawioUrl]);
+  }, [drawioMode, activePageIndex, currentTheme, customDrawioUrl]);
 
   // Inject toolbar extras
   useEffect(() => {
@@ -245,37 +284,63 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
               </Button>
             </Dropdown>
           )}
+          <Tooltip
+            content={
+              drawioMode === 'edit'
+                ? t('preview.drawio.switchToView', { defaultValue: 'Switch to View Mode' })
+                : t('preview.drawio.switchToEdit', { defaultValue: 'Switch to Visual Edit Mode' })
+            }
+            mini
+          >
+            <Button
+              size='mini'
+              type={drawioMode === 'edit' ? 'primary' : 'secondary'}
+              className='flex items-center gap-4px px-8px h-24px text-12px'
+              onClick={() => setDrawioMode((prev) => (prev === 'edit' ? 'view' : 'edit'))}
+            >
+              {drawioMode === 'edit' ? <EditOne size={12} /> : <PreviewOpen size={12} />}
+              <span>
+                {drawioMode === 'edit'
+                  ? t('preview.drawio.editMode', { defaultValue: 'Visual Edit' })
+                  : t('preview.drawio.viewMode', { defaultValue: 'View' })}
+              </span>
+            </Button>
+          </Tooltip>
         </div>
       ),
       right: (
         <div className='flex items-center gap-4px'>
-          <Tooltip content={t('preview.drawio.zoomIn', { defaultValue: 'Zoom In' })} mini>
-            <Button
-              size='mini'
-              type='text'
-              className='h-24px px-6px text-t-secondary hover:text-t-primary'
-              icon={<ZoomIn size={14} />}
-              onClick={() => handleZoom('in')}
-            />
-          </Tooltip>
-          <Tooltip content={t('preview.drawio.zoomOut', { defaultValue: 'Zoom Out' })} mini>
-            <Button
-              size='mini'
-              type='text'
-              className='h-24px px-6px text-t-secondary hover:text-t-primary'
-              icon={<ZoomOut size={14} />}
-              onClick={() => handleZoom('out')}
-            />
-          </Tooltip>
-          <Tooltip content={t('preview.drawio.fitView', { defaultValue: 'Fit to View' })} mini>
-            <Button
-              size='mini'
-              type='text'
-              className='h-24px px-6px text-t-secondary hover:text-t-primary'
-              icon={<FullScreenOne size={14} />}
-              onClick={() => handleZoom('fit')}
-            />
-          </Tooltip>
+          {drawioMode === 'view' && (
+            <>
+              <Tooltip content={t('preview.drawio.zoomIn', { defaultValue: 'Zoom In' })} mini>
+                <Button
+                  size='mini'
+                  type='text'
+                  className='h-24px px-6px text-t-secondary hover:text-t-primary'
+                  icon={<ZoomIn size={14} />}
+                  onClick={() => handleZoom('in')}
+                />
+              </Tooltip>
+              <Tooltip content={t('preview.drawio.zoomOut', { defaultValue: 'Zoom Out' })} mini>
+                <Button
+                  size='mini'
+                  type='text'
+                  className='h-24px px-6px text-t-secondary hover:text-t-primary'
+                  icon={<ZoomOut size={14} />}
+                  onClick={() => handleZoom('out')}
+                />
+              </Tooltip>
+              <Tooltip content={t('preview.drawio.fitView', { defaultValue: 'Fit to View' })} mini>
+                <Button
+                  size='mini'
+                  type='text'
+                  className='h-24px px-6px text-t-secondary hover:text-t-primary'
+                  icon={<FullScreenOne size={14} />}
+                  onClick={() => handleZoom('fit')}
+                />
+              </Tooltip>
+            </>
+          )}
           <Tooltip content={t('preview.drawio.openInApp', { defaultValue: 'Open in Diagrams.net' })} mini>
             <Button
               size='mini'
@@ -297,6 +362,7 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
     hideToolbar,
     pages,
     activePageIndex,
+    drawioMode,
     handlePageSelect,
     handleZoom,
     handleOpenDiagramsNet,

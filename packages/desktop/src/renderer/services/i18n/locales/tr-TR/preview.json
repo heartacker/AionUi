@@ -209,5 +209,10 @@
     "zoomIn": "Yakınlaştır",
     "zoomOut": "Uzaklaştır",
     "openInApp": "Diagrams.net'te Aç"
-  }
+  },
+  "drawio.editMode": "Görsel Düzenleme",
+  "drawio.viewMode": "Görüntüle",
+  "drawio.switchToView": "Görüntüleme Moduna Geç",
+  "drawio.switchToEdit": "Görsel Düzenleme Moduna Geç",
+  "drawio.saveSuccess": "Draw.io şeması kaydedildi"
 }
