@@ -581,4 +581,35 @@ describe('DiagramGalleryContext', () => {
       host2.remove();
     }
   });
+
+  it('renders adjacent slides in a sliding carousel track for continuous window sliding', () => {
+    stubMatchMedia({});
+    render(<GalleryHarness activeId='two' />);
+    expect(screen.getByTestId('diagram-carousel-track')).toBeInTheDocument();
+    expect(screen.getByTestId('diagram-slide-prev')).toBeInTheDocument();
+    expect(screen.getByTestId('diagram-slide-current')).toBeInTheDocument();
+    expect(screen.getByTestId('diagram-slide-next')).toBeInTheDocument();
+  });
+
+  it('swallows trailing synthetic click on window when closing via backdrop tap', () => {
+    const onClose = vi.fn();
+    render(<DiagramZoomOverlay items={makeItems()} activeId='one' onNavigate={() => {}} onClose={onClose} />);
+    const overlay = screen.getByTestId('diagram-zoom-overlay');
+    // Tap on backdrop without dragging
+    fireEvent.pointerDown(overlay, { pointerId: 99, pointerType: 'touch', button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(overlay, { pointerId: 99, pointerType: 'touch', clientX: 10, clientY: 10 });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // Behind element click is swallowed
+    const behindClicked = vi.fn();
+    const btn = document.createElement('button');
+    btn.onclick = behindClicked;
+    document.body.appendChild(btn);
+    try {
+      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(behindClicked).not.toHaveBeenCalled();
+    } finally {
+      btn.remove();
+    }
+  });
 });

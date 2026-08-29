@@ -16,7 +16,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from '@icon-park/react';
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Message } from '@arco-design/web-react';
@@ -141,6 +141,9 @@ function DiagramZoomOverlay({
   const [base, setBase] = useState<DiagramSize | null>(null);
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [slideOffset, setSlideOffset] = useState(0);
+  const [isSliding, setIsSliding] = useState(false);
+
   // Multi-pointer gesture state: one pointer pans / may swipe-navigate (touch),
   // two pointers pinch-zoom around the moving midpoint.
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -176,7 +179,7 @@ function DiagramZoomOverlay({
     const small768 = window.matchMedia?.('(max-width: 768px)');
     const coarseQuery = window.matchMedia?.('(pointer: coarse)');
     const update = () => {
-      setIsSmallScreen(Boolean(small640?.matches || small768?.matches || window.innerWidth <= 768));
+      setIsSmallScreen(Boolean(small640?.matches || small768?.matches));
       setIsTouchDevice(Boolean(coarseQuery?.matches));
     };
     small640?.addEventListener?.('change', update);
@@ -219,6 +222,12 @@ function DiagramZoomOverlay({
   const activeItem = isGallery && activeIndex >= 0 ? items[activeIndex] : null;
   const overlaySvg = useMemo(() => stripInlineMaxWidth(activeItem ? activeItem.svg : (svg ?? '')), [activeItem, svg]);
 
+  // Previous and next items for the sliding carousel track
+  const prevIndex = activeIndex > 0 ? activeIndex - 1 : -1;
+  const nextIndex = isGallery && items && activeIndex < items.length - 1 ? activeIndex + 1 : -1;
+  const prevItem = isGallery && items && prevIndex >= 0 ? items[prevIndex] : null;
+  const nextItem = isGallery && items && nextIndex >= 0 ? items[nextIndex] : null;
+
   // Switching diagrams re-runs the sizing pipeline from scratch: forget the
   // previous diagram's size, scale and pan so the next one is measured and
   // contain-fitted again instead of inheriting the old view.
@@ -227,6 +236,7 @@ function DiagramZoomOverlay({
     setBase(null);
     setScale(1);
     setTranslate({ x: 0, y: 0 });
+    setSlideOffset(0);
   }, [activeKey]);
 
   // Resolve the natural diagram size (viewBox first, then a DOM measurement for
@@ -277,6 +287,18 @@ function DiagramZoomOverlay({
     return () => element.removeEventListener('wheel', handleWheel);
   }, []);
 
+  const navigateBy = useCallback(
+    (direction: -1 | 1) => {
+      if (!isGallery || !items || !onNavigate) return;
+      const target = activeIndex + direction;
+      if (target >= 0 && target < items.length) {
+        onNavigate(items[target].id);
+        setSlideOffset(0);
+      }
+    },
+    [isGallery, items, onNavigate, activeIndex]
+  );
+
   // Keyboard: ESC closes; gallery mode also flips diagrams with ←/→ (or A/D)
   // and jumps to the first/last with Home/End.
   useEffect(() => {
@@ -288,9 +310,9 @@ function DiagramZoomOverlay({
       if (!isGallery || !items || !onNavigate || items.length === 0) return;
       const last = items.length - 1;
       if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') {
-        if (activeIndex > 0) onNavigate(items[activeIndex - 1].id);
+        if (activeIndex > 0) navigateBy(-1);
       } else if (event.key === 'ArrowRight' || event.key === 'd' || event.key === 'D') {
-        if (activeIndex < last) onNavigate(items[activeIndex + 1].id);
+        if (activeIndex < last) navigateBy(1);
       } else if (event.key === 'Home') {
         onNavigate(items[0].id);
       } else if (event.key === 'End') {
@@ -299,12 +321,13 @@ function DiagramZoomOverlay({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isGallery, items, activeIndex, onNavigate, onClose]);
+  }, [isGallery, items, activeIndex, onNavigate, navigateBy, onClose]);
 
   const zoomBy = (factor: number) => setScale((prev) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, prev * factor)));
   const resetView = () => {
     setScale(initialScaleRef.current);
     setTranslate({ x: 0, y: 0 });
+    setSlideOffset(0);
   };
 
   const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -329,7 +352,10 @@ function DiagramZoomOverlay({
     setIsPanning(true);
 
     const isBackdropClick =
-      target === event.currentTarget || target.getAttribute('data-testid') === 'diagram-zoom-overlay';
+      target === event.currentTarget ||
+      target.getAttribute('data-testid') === 'diagram-zoom-overlay' ||
+      target.getAttribute('data-testid') === 'diagram-carousel-track' ||
+      target.getAttribute('data-testid') === 'diagram-slide-current';
 
     if (pointersRef.current.size === 1) {
       // Single pointer: pan; a touch pointer is also a swipe-to-navigate candidate.
@@ -346,6 +372,7 @@ function DiagramZoomOverlay({
     } else if (pointersRef.current.size === 2) {
       // Second finger lands: switch from swipe to pinch, anchored on the current view.
       swipeRef.current = null;
+      setSlideOffset(0);
       const [first, second] = [...pointersRef.current.values()];
       pinchRef.current = {
         startDistance: Math.hypot(first.x - second.x, first.y - second.y) || 1,
@@ -378,9 +405,23 @@ function DiagramZoomOverlay({
     if (!swipe || swipe.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - swipe.startX;
     const deltaY = event.clientY - swipe.startY;
-    if (!swipe.moved && Math.abs(deltaX) + Math.abs(deltaY) < DRAG_THRESHOLD) return;
+    const distance = Math.hypot(deltaX, deltaY);
+    if (!swipe.moved && distance < DRAG_THRESHOLD) return;
     swipe.moved = true;
-    setTranslate({ x: swipe.originX + deltaX, y: swipe.originY + deltaY });
+
+    const atFitScale = scale <= initialScaleRef.current + 0.05;
+    const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+
+    if (isGallery && (items?.length ?? 0) > 1 && atFitScale && isHorizontal) {
+      // Horizontal slide on track like a real mobile sliding window
+      const isEdgeLeft = deltaX > 0 && activeIndex === 0;
+      const isEdgeRight = deltaX < 0 && activeIndex >= (items?.length ?? 1) - 1;
+      const damped = isEdgeLeft || isEdgeRight ? deltaX * 0.35 : deltaX;
+      setSlideOffset(damped);
+    } else {
+      // Normal pan
+      setTranslate({ x: swipe.originX + deltaX, y: swipe.originY + deltaY });
+    }
   };
 
   const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -421,17 +462,48 @@ function DiagramZoomOverlay({
       const deltaY = event.clientY - swipe.startY;
       const distance = Math.hypot(deltaX, deltaY);
       const atFitScale = scale <= initialScaleRef.current + 0.05;
-      const isHorizontalFlick = Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) * 1.5;
 
       if (!swipe.moved && distance < DRAG_THRESHOLD && swipe.isBackdrop) {
-        // Tapped directly on backdrop without dragging -> close
+        // Tapped directly on backdrop without dragging -> safely close without click-through
+        if (typeof window !== 'undefined') {
+          const swallow = (e: MouseEvent) => {
+            e.stopPropagation();
+            e.preventDefault();
+          };
+          window.addEventListener('click', swallow, { capture: true, once: true });
+          setTimeout(() => {
+            window.removeEventListener('click', swallow, { capture: true });
+          }, 350);
+        }
         onClose();
         if (pointersRef.current.size === 0) setIsPanning(false);
         return;
       }
 
-      if ((swipe.pointerType === 'touch' || isSmallScreen) && atFitScale && isHorizontalFlick) {
-        navigateBy(deltaX < 0 ? 1 : -1);
+      if (isGallery && (items?.length ?? 0) > 1 && atFitScale) {
+        const isEdgeLeft = deltaX > 0 && activeIndex === 0;
+        const isEdgeRight = deltaX < 0 && activeIndex >= (items?.length ?? 1) - 1;
+        const isSwipeGesture = (swipe.pointerType === 'touch' || isSmallScreen) && Math.abs(deltaX) > SWIPE_THRESHOLD;
+
+        if (
+          deltaX < -SWIPE_THRESHOLD &&
+          !isEdgeRight &&
+          activeIndex < (items?.length ?? 0) - 1 &&
+          (isSwipeGesture || Math.abs(slideOffset) > 0)
+        ) {
+          onNavigate?.(items![activeIndex + 1].id);
+          setSlideOffset(0);
+        } else if (
+          deltaX > SWIPE_THRESHOLD &&
+          !isEdgeLeft &&
+          activeIndex > 0 &&
+          (isSwipeGesture || Math.abs(slideOffset) > 0)
+        ) {
+          onNavigate?.(items![activeIndex - 1].id);
+          setSlideOffset(0);
+        } else {
+          setSlideOffset(0);
+        }
       }
     }
 
@@ -448,12 +520,15 @@ function DiagramZoomOverlay({
         height: base.height * scale,
         padding: isMobileOrTablet ? '0px' : '12px',
         borderRadius: isMobileOrTablet ? '0px' : '8px',
+        boxSizing: 'border-box',
       }
     : {
         maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
         maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
+        width: isMobileOrTablet ? '100vw' : undefined,
         padding: isMobileOrTablet ? '0px' : '12px',
         borderRadius: isMobileOrTablet ? '0px' : '8px',
+        boxSizing: 'border-box',
       };
   // Pan transforms the card itself: the overlay root is the fixed clip window,
   // so every part of an oversized diagram stays reachable by dragging.
@@ -485,12 +560,6 @@ function DiagramZoomOverlay({
   // node cleanly; the viewport reset lives in the effect above (overlay state
   // is not per-card).
   const contentKey = activeKey;
-
-  const navigateBy = (direction: -1 | 1) => {
-    if (!isGallery || !items || !onNavigate) return;
-    const target = activeIndex + direction;
-    if (target >= 0 && target < items.length) onNavigate(items[target].id);
-  };
 
   const itemCount = isGallery && items ? items.length : 0;
   const canPrev = itemCount > 1 && activeIndex > 0;
@@ -926,26 +995,122 @@ function DiagramZoomOverlay({
         </div>
       </div>
 
+      {/* Sliding Carousel Track: enables true mobile photo-album sliding window transition */}
       <div
-        key={contentKey}
-        data-testid='diagram-zoom-content'
-        onPointerDown={handlePanPointerDown}
-        onPointerMove={handlePanPointerMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
+        data-testid='diagram-carousel-track'
         style={{
-          padding: '12px',
-          background: cardBackground ?? 'var(--bg-1)',
-          borderRadius: '8px',
-          flexShrink: 0,
-          cursor: isPanning ? 'grabbing' : 'grab',
-          userSelect: 'none',
-          touchAction: 'none',
-          transform: diagramTransform,
-          ...contentStyle,
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: `translateX(${slideOffset}px)`,
+          transition: isSliding ? 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
+          pointerEvents: 'none',
         }}
-        dangerouslySetInnerHTML={{ __html: overlaySvg }}
-      />
+      >
+        {/* Previous Slide (positioned at -100vw) */}
+        {prevItem && (
+          <div
+            data-testid='diagram-slide-prev'
+            style={{
+              position: 'absolute',
+              left: '-100vw',
+              width: '100vw',
+              height: '100vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                background: prevItem.panelBackground ?? cardBackground ?? 'var(--bg-1)',
+                padding: isMobileOrTablet ? '0px' : '12px',
+                borderRadius: isMobileOrTablet ? '0px' : '8px',
+                width: isMobileOrTablet ? '100vw' : undefined,
+                maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
+                maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+              }}
+              dangerouslySetInnerHTML={{ __html: stripInlineMaxWidth(prevItem.svg) }}
+            />
+          </div>
+        )}
+
+        {/* Current Active Slide */}
+        <div
+          data-testid='diagram-slide-current'
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            key={contentKey}
+            data-testid='diagram-zoom-content'
+            onPointerDown={handlePanPointerDown}
+            onPointerMove={handlePanPointerMove}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}
+            style={{
+              background: cardBackground ?? 'var(--bg-1)',
+              flexShrink: 0,
+              cursor: isPanning ? 'grabbing' : 'grab',
+              userSelect: 'none',
+              touchAction: 'none',
+              transform: diagramTransform,
+              transition: isPanning ? 'none' : 'transform 0.12s ease-out',
+              pointerEvents: 'auto',
+              ...contentStyle,
+            }}
+            dangerouslySetInnerHTML={{ __html: overlaySvg }}
+          />
+        </div>
+
+        {/* Next Slide (positioned at +100vw) */}
+        {nextItem && (
+          <div
+            data-testid='diagram-slide-next'
+            style={{
+              position: 'absolute',
+              left: '100vw',
+              width: '100vw',
+              height: '100vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                background: nextItem.panelBackground ?? cardBackground ?? 'var(--bg-1)',
+                padding: isMobileOrTablet ? '0px' : '12px',
+                borderRadius: isMobileOrTablet ? '0px' : '8px',
+                width: isMobileOrTablet ? '100vw' : undefined,
+                maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
+                maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box',
+              }}
+              dangerouslySetInnerHTML={{ __html: stripInlineMaxWidth(nextItem.svg) }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Bottom gallery footer — like a photo album: compact prev/counter/next
           cluster and the clickable thumbnail strip. The title lives in the top
