@@ -518,43 +518,49 @@ export const saveDiagramImage = async (
 ): Promise<void> => {
   const cleanSvg = cleanSvgForXml(ensureSvgNamespaces(svg));
   let blob: Blob;
+  let finalFilename = filename;
 
   if (format === 'svg') {
     blob = buildSvgBlob(cleanSvg, options);
-  } else if (format === 'png-light') {
-    blob = await svgToPngBlob(cleanSvg, {
-      ...options,
-      background: '#ffffff',
-      themeBackground: '#ffffff',
-      isDark: false,
-      textColor: '#1d2129',
-    });
-  } else if (format === 'png-dark') {
-    blob = await svgToPngBlob(cleanSvg, {
-      ...options,
-      background: '#1d2129',
-      themeBackground: '#1d2129',
-      isDark: true,
-      textColor: '#e5e6eb',
-    });
-  } else if (format === 'png-transparent') {
-    // Transparent PNG defaults to high-contrast dark text (#1d2129) so it is clearly
-    // readable when embedded into common light/white documents (Word, PPT, Notion, Web).
-    blob = await svgToPngBlob(cleanSvg, {
-      ...options,
-      background: 'transparent',
-      isDark: false,
-      textColor: '#1d2129',
-    });
   } else {
-    // format is 'png-theme' or legacy 'png'
-    blob = await svgToPngBlob(cleanSvg, options);
+    try {
+      if (format === 'png-light') {
+        blob = await svgToPngBlob(cleanSvg, {
+          ...options,
+          background: '#ffffff',
+          themeBackground: '#ffffff',
+          isDark: false,
+          textColor: '#1d2129',
+        });
+      } else if (format === 'png-dark') {
+        blob = await svgToPngBlob(cleanSvg, {
+          ...options,
+          background: '#1d2129',
+          themeBackground: '#1d2129',
+          isDark: true,
+          textColor: '#e5e6eb',
+        });
+      } else if (format === 'png-transparent') {
+        blob = await svgToPngBlob(cleanSvg, {
+          ...options,
+          background: 'transparent',
+          isDark: false,
+          textColor: '#1d2129',
+        });
+      } else {
+        blob = await svgToPngBlob(cleanSvg, options);
+      }
+    } catch (err) {
+      console.warn('[saveDiagramImage] PNG rasterization failed, falling back to SVG export:', err);
+      blob = buildSvgBlob(cleanSvg, options);
+      finalFilename = filename.replace(/\.png$/i, '.svg');
+    }
   }
 
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = filename;
+  anchor.download = finalFilename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
