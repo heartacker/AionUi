@@ -199,3 +199,24 @@ describe('prepareDiagramSvgForExport', () => {
     expect(result).toContain('#e5e6eb');
   });
 });
+
+describe('SVG sanitization and snapshot helpers', () => {
+  it('strips markdown code fences and XML declarations', async () => {
+    const { stripSvgCodeFence } = await import('@/renderer/components/Markdown/diagrams/diagramExport');
+    const raw = '```svg\n<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE svg>\n<svg><circle /></svg>\n```';
+    expect(stripSvgCodeFence(raw)).toBe('<svg><circle /></svg>');
+  });
+
+  it('synthesizes viewBox when missing but width and height exist', async () => {
+    const { ensureSvgViewBox } = await import('@/renderer/components/Markdown/diagrams/diagramExport');
+    const raw = '<svg width="200px" height="150px"><rect /></svg>';
+    expect(ensureSvgViewBox(raw)).toContain('viewBox="0 0 200 150"');
+  });
+
+  it('builds image snapshot SVG container', async () => {
+    const { buildImageSnapshotSvg } = await import('@/renderer/components/Markdown/diagrams/diagramExport');
+    const result = buildImageSnapshotSvg('https://example.com/test.png', 400, 300);
+    expect(result).toContain('viewBox="0 0 400 300"');
+    expect(result).toContain('<image href="https://example.com/test.png"');
+  });
+});

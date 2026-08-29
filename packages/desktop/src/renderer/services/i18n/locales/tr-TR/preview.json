@@ -193,5 +193,7 @@
   "diagramFormatPngTransparent": "PNG (Şeffaf)",
   "diagramGalleryHintTouch": "Sıkıştırarak yakınlaştırın • Sürükleyerek taşıyın • Kaydırarak geçiş yapın",
   "diagramGalleryHelp": "Yardım",
-  "diagramGalleryOpenHint": "Galeride açmak için başlık çubuğuna çift tıklayın"
+  "diagramGalleryOpenHint": "Galeride açmak için başlık çubuğuna çift tıklayın",
+  "svgTitle": "SVG Grafiği",
+  "imageTitle": "Görsel Önizleme"
 }

@@ -1,8 +1,10 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import EchartsBlock from '@/renderer/components/Markdown/diagrams/EchartsBlock';
-import { buildChartSnapshotSvg, parseEChartsOption } from '@/renderer/components/Markdown/diagrams/echartsUtils';
+import EchartsBlock, {
+  buildChartSnapshotSvg,
+  parseEChartsOption,
+} from '@/renderer/components/Markdown/diagrams/EchartsBlock';
 
 const mockInit = vi.fn();
 const mockSetOption = vi.fn();
@@ -264,7 +266,7 @@ describe('EchartsBlock Component', () => {
 
     fireEvent.doubleClick(screen.getByTestId('echarts-header'));
     expect(mockGetDataURL).toHaveBeenCalledTimes(1);
-    expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
+    expect(mockGetDataURL).toHaveBeenCalledWith({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' });
 
     expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument();
     const content = screen.getByTestId('diagram-zoom-content');

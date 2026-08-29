@@ -195,5 +195,7 @@
   "diagramFormatPngTransparent": "PNG (Прозорий)",
   "diagramGalleryHintTouch": "Щипок — масштаб • Перетягування — панорама • Свайп — перемикання",
   "diagramGalleryHelp": "Довідка",
-  "diagramGalleryOpenHint": "Двічі клацніть заголовок, щоб відкрити в галереї"
+  "diagramGalleryOpenHint": "Двічі клацніть заголовок, щоб відкрити в галереї",
+  "svgTitle": "SVG-зображення",
+  "imageTitle": "Попередній перегляд зображення"
 }

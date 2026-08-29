@@ -5,7 +5,9 @@
  */
 
 import { copyText } from '@/renderer/utils/ui/clipboard';
-import { getSvgIntrinsicSize } from '../markdownUtils';
+import { ensureSvgViewBox, getSvgIntrinsicSize } from '../markdownUtils';
+
+export { ensureSvgViewBox };
 
 export type DiagramExportFormat = 'svg' | 'png' | 'png-light' | 'png-dark' | 'png-transparent' | 'png-theme';
 
@@ -18,6 +20,30 @@ export type SvgToPngOptions = {
 
 // Rasterize at 2x the natural size so exported PNGs stay crisp on HiDPI.
 const PNG_SCALE = 2;
+
+/**
+ * Strips markdown code fence markers (e.g. ```svg ... ```) and XML declaration/DOCTYPE wrappers.
+ */
+export const stripSvgCodeFence = (raw: string): string => {
+  let text = raw.trim();
+  text = text
+    .replace(/^```(?:svg|xml|html)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+  text = text.replace(/^<\?xml[\s\S]*?\?>/i, '').trim();
+  text = text.replace(/^<!DOCTYPE[\s\S]*?>/i, '').trim();
+  return text;
+};
+
+/**
+ * Fully sanitize, namespace, and format an SVG string for safe rendering and gallery viewing.
+ */
+export const sanitizeAndFormatSvg = (rawSvg: string): string => {
+  const stripped = stripSvgCodeFence(rawSvg);
+  const namespaced = ensureSvgNamespaces(stripped);
+  const withViewBox = ensureSvgViewBox(namespaced);
+  return cleanSvgForXml(withViewBox);
+};
 
 /**
  * Fix unclosed void HTML tags (e.g. <br>, <hr>, <img>, <input>) and named entities
@@ -457,6 +483,22 @@ export const copySvgImage = async (svg: string, options?: SvgToPngOptions): Prom
 };
 
 /**
+ * Wrap an image URL (data URL or web/local URL) in an SVG container
+ * so it can seamlessly enter the diagram gallery stream with measurement & zoom.
+ */
+export const buildImageSnapshotSvg = (url: string, width = 800, height = 600): string => {
+  const w = Math.max(10, Math.ceil(width));
+  const h = Math.max(10, Math.ceil(height));
+  const escapedUrl = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
+    `width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<image href="${escapedUrl}" xlink:href="${escapedUrl}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>` +
+    `</svg>`
+  );
+};
+
+/**
  * Trigger a browser download for the diagram. SVG is written verbatim (vector);
  * PNG goes through the rasterizer (or direct raster blob for chart snapshots).
  */
@@ -551,7 +593,7 @@ export const prepareDiagramSvgForExport = async (
   if (item.type === 'chart') {
     try {
       const echarts = await import('echarts');
-      const { parseEChartsOption, buildChartSnapshotSvg } = await import('./echartsUtils');
+      const { parseEChartsOption, buildChartSnapshotSvg } = await import('./EchartsBlock');
       const option = parseEChartsOption(item.code);
       if (option && typeof document !== 'undefined') {
         const div = document.createElement('div');

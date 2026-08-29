@@ -346,6 +346,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
   return (
     <div
       ref={blockRef}
+      data-diagram-id={String(idRef.current)}
       style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
