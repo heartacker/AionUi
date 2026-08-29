@@ -25,6 +25,7 @@ import LocalImageView from '@renderer/components/media/LocalImageView';
 import CodeBlock from './CodeBlock';
 import LocalFileLink from './LocalFileLink';
 import ShadowView from './ShadowView';
+import SvgBlock from './diagrams/SvgBlock';
 import { MARKDOWN_REMARK_PLUGINS, MarkdownTable, MarkdownTd } from './markdownComponents';
 import { resolveLocalFileLinkPath, resolveLocalFileLinkReference } from './markdownUtils';
 import type { LocalFileLinkReference } from './markdownUtils';
@@ -125,6 +126,9 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
           const imgProps = rest as React.ImgHTMLAttributes<HTMLImageElement>;
           const src = decodeURIComponent(imgProps.src || '');
           return <LocalImageView src={src} alt={imgProps.alt || ''} className={imgProps.className} />;
+        },
+        svg: (props: Record<string, unknown>) => {
+          return <SvgBlock {...(props as React.SVGProps<SVGSVGElement>)} />;
         },
       }),
       [codeStyle, hiddenCodeCopyButton, handleLinkClick, onLocalFileLink]
