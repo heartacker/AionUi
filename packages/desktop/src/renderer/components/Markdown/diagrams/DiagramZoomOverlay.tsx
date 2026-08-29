@@ -464,19 +464,33 @@ function DiagramZoomOverlay({
     const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
     const isVerticalSwipe = Math.abs(deltaY) > Math.abs(deltaX);
 
-    if (atFitScale && isVerticalSwipe && (swipe.pointerType === 'touch' || isSmallScreen)) {
-      // Swiping up or down to exit
-      setDismissOffsetY(deltaY);
-      setSlideOffset(0);
-    } else if (isGallery && (items?.length ?? 0) > 1 && atFitScale && isHorizontal) {
-      // Horizontal slide on track like a real mobile sliding window
-      setDismissOffsetY(0);
-      const isEdgeLeft = deltaX > 0 && activeIndex === 0;
-      const isEdgeRight = deltaX < 0 && activeIndex >= (items?.length ?? 1) - 1;
-      const damped = isEdgeLeft || isEdgeRight ? deltaX * 0.35 : deltaX;
-      setSlideOffset(damped);
+    if (atFitScale) {
+      if (swipe.pointerType === 'touch' || isMobileOrTablet) {
+        // Touch screens at fit scale (not zoomed in): do NOT pan the card around (setTranslate).
+        // Gestures are dedicated to vertical dismiss (swipe up/down) and horizontal carousel slide.
+        if (isVerticalSwipe) {
+          setDismissOffsetY(deltaY);
+          setSlideOffset(0);
+        } else if (isHorizontal) {
+          setDismissOffsetY(0);
+          if (isGallery && (items?.length ?? 0) > 1) {
+            const isEdgeLeft = deltaX > 0 && activeIndex === 0;
+            const isEdgeRight = deltaX < 0 && activeIndex >= (items?.length ?? 1) - 1;
+            const damped = isEdgeLeft || isEdgeRight ? deltaX * 0.35 : deltaX;
+            setSlideOffset(damped);
+          } else {
+            // Single diagram: elastic horizontal resistance
+            setSlideOffset(deltaX * 0.35);
+          }
+        }
+      } else {
+        // Mouse on desktop: pan diagram
+        setDismissOffsetY(0);
+        setSlideOffset(0);
+        setTranslate({ x: swipe.originX + deltaX, y: swipe.originY + deltaY });
+      }
     } else {
-      // Normal pan when zoomed in
+      // Zoomed in (scale > initialScale): single-pointer drag freely pans/drags the enlarged image around.
       setDismissOffsetY(0);
       setSlideOffset(0);
       setTranslate({ x: swipe.originX + deltaX, y: swipe.originY + deltaY });
@@ -1228,7 +1242,13 @@ function DiagramZoomOverlay({
             style={{
               background: cardBackground ?? 'var(--bg-1)',
               flexShrink: 0,
-              cursor: isPanning ? 'grabbing' : 'grab',
+              cursor: isPanning
+                ? 'grabbing'
+                : isMobileOrTablet
+                  ? 'default'
+                  : scale <= initialScaleRef.current + 0.05
+                    ? 'zoom-in'
+                    : 'grab',
               userSelect: 'none',
               touchAction: 'none',
               transform: diagramTransform,
