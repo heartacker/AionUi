@@ -307,3 +307,24 @@ export const getSvgIntrinsicSize = (svg: string): DiagramSize | null => {
   }
   return null;
 };
+
+/**
+ * Ensures an SVG root element has a valid viewBox attribute. If missing but width & height
+ * are specified, synthesizes `viewBox="0 0 width height"` so it scales properly in the overlay.
+ */
+export const ensureSvgViewBox = (svg: string): string => {
+  if (!svg || !svg.includes('<svg')) return svg;
+  return svg.replace(/<svg\b([^>]*)>/i, (tag, attrs: string) => {
+    if (/\bviewBox\s*=/i.test(attrs)) return tag;
+    const widthMatch = /\bwidth\s*=\s*["']([\d.]+)(?:px)?["']/i.exec(attrs);
+    const heightMatch = /\bheight\s*=\s*["']([\d.]+)(?:px)?["']/i.exec(attrs);
+    if (widthMatch && heightMatch) {
+      const w = parseFloat(widthMatch[1]);
+      const h = parseFloat(heightMatch[1]);
+      if (w > 0 && h > 0) {
+        return `<svg${attrs} viewBox="0 0 ${w} ${h}">`;
+      }
+    }
+    return tag;
+  });
+};

@@ -193,5 +193,7 @@
   "diagramFormatPngTransparent": "PNG (透明)",
   "diagramGalleryHintTouch": "ピンチでズーム • ドラッグでパン • スワイプで図を切り替え",
   "diagramGalleryHelp": "ヘルプ",
-  "diagramGalleryOpenHint": "タイトルバーをダブルクリックしてギャラリーで表示"
+  "diagramGalleryOpenHint": "タイトルバーをダブルクリックしてギャラリーで表示",
+  "svgTitle": "SVG ベクター画像",
+  "imageTitle": "画像プレビュー"
 }

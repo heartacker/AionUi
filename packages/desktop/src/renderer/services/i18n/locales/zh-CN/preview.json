@@ -193,5 +193,7 @@
   "diagramFormatPngTransparent": "PNG (透明)",
   "diagramGalleryHintTouch": "双指缩放 • 拖拽平移 • 左右滑动切换图表",
   "diagramGalleryHelp": "帮助",
-  "diagramGalleryOpenHint": "双击标题栏在画册中查看"
+  "diagramGalleryOpenHint": "双击标题栏在画册中查看",
+  "svgTitle": "SVG 矢量图",
+  "imageTitle": "图片预览"
 }

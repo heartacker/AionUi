@@ -261,6 +261,7 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
   return (
     <div
       ref={blockRef}
+      data-diagram-id={blockIdRef.current}
       style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...style }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

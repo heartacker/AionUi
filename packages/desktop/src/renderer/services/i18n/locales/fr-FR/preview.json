@@ -193,5 +193,7 @@
   "diagramFormatPngTransparent": "PNG (Transparent)",
   "diagramGalleryHintTouch": "Pincer pour zoomer • Glisser pour déplacer • Balayer pour changer",
   "diagramGalleryHelp": "Aide",
-  "diagramGalleryOpenHint": "Double-cliquez sur la barre de titre pour ouvrir dans la galerie"
+  "diagramGalleryOpenHint": "Double-cliquez sur la barre de titre pour ouvrir dans la galerie",
+  "svgTitle": "Graphique SVG",
+  "imageTitle": "Aperçu de l'image"
 }

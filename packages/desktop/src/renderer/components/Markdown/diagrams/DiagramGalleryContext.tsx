@@ -16,7 +16,7 @@ export type DiagramItem = {
   /** Raw source code of the block, for the copy-source toolbar action. */
   code?: string;
   /** Diagram kind; drives the gallery header label. 'chart' is reserved for future canvas-based types. */
-  type: 'mermaid' | 'wavedrom' | 'math' | 'chart';
+  type: 'mermaid' | 'wavedrom' | 'math' | 'chart' | 'svg' | 'image';
   /** Optional display title (first non-empty source line, truncated). */
   title?: string;
   /** Card backdrop for diagrams whose strokes depend on it (WaveDrom dark skin). */
@@ -56,6 +56,29 @@ export const createDiagramGalleryValue = (
 });
 
 /**
+ * Sorts diagram items by their actual order of appearance in the DOM.
+ * This guarantees items in the gallery strictly follow the top-to-bottom stream
+ * regardless of async rendering completion timings (e.g. sync SVG vs async Mermaid).
+ */
+export const sortDiagramItemsByDomOrder = (items: DiagramItem[]): DiagramItem[] => {
+  if (typeof document === 'undefined' || items.length <= 1) return items;
+  return [...items].sort((a, b) => {
+    const elA = document.querySelector(`[data-diagram-id="${a.id}"]`) || document.getElementById(a.id);
+    const elB = document.querySelector(`[data-diagram-id="${b.id}"]`) || document.getElementById(b.id);
+    if (!elA || !elB) return 0;
+    if (elA === elB) return 0;
+    const position = elA.compareDocumentPosition(elB);
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+      return -1; // a comes before b in DOM
+    }
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+      return 1; // a comes after b in DOM
+    }
+    return 0;
+  });
+};
+
+/**
  * Session-scoped registry + overlay host for rendered diagrams (Mermaid,
  * WaveDrom, and future chart types). Mounted once around the conversation so
  * every diagram block in the message stream registers into the same gallery;
@@ -67,18 +90,21 @@ export const createDiagramGalleryValue = (
  * exists at a time even when dozens of messages are mounted.
  */
 export function DiagramGalleryProvider({ children }: { children: React.ReactNode }) {
-  // Order = insertion order. Re-registration (streaming re-render) overwrites
-  // in place, so a re-rendered diagram keeps its position in the stream.
+  // Order = DOM stream order.
   const [items, setItems] = useState<DiagramItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const registerDiagram = useCallback((item: DiagramItem) => {
     setItems((prev) => {
       const index = prev.findIndex((existing) => existing.id === item.id);
-      if (index < 0) return [...prev, item];
-      const next = [...prev];
-      next[index] = item;
-      return next;
+      let next: DiagramItem[];
+      if (index < 0) {
+        next = [...prev, item];
+      } else {
+        next = [...prev];
+        next[index] = item;
+      }
+      return sortDiagramItemsByDomOrder(next);
     });
   }, []);
 
@@ -90,6 +116,7 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
   }, []);
 
   const openGallery = useCallback((id: string) => {
+    setItems((prev) => sortDiagramItemsByDomOrder(prev));
     setActiveId(id);
   }, []);
 

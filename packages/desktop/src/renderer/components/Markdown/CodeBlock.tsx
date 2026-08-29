@@ -15,6 +15,7 @@ import MermaidBlock from './diagrams/MermaidBlock';
 import WavedromBlock from './diagrams/WavedromBlock';
 import EchartsBlock from './diagrams/EchartsBlock';
 import MathBlock from './diagrams/MathBlock';
+import SvgBlock from './diagrams/SvgBlock';
 import { formatCode, getDiffLineStyle } from './markdownUtils';
 
 const PREVIEW_LINES = 3;
@@ -105,6 +106,13 @@ function CodeBlock(props: CodeBlockProps) {
         diagramPanZoom={props.diagramPanZoom}
       />
     );
+  }
+
+  if (
+    language === 'svg' ||
+    ((language === 'xml' || language === 'html') && String(children).trim().startsWith('<svg'))
+  ) {
+    return <SvgBlock code={formatCode(children)} style={props.codeStyle} enablePanZoom={props.diagramPanZoom} />;
   }
 
   // Inline code (single line)
