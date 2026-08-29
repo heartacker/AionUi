@@ -269,6 +269,11 @@ export const inlineFontUrls = async (css: string, baseUrl: string): Promise<stri
   return result;
 };
 
+const extractFontFaces = (css: string): string => {
+  const matches = css.match(/@font-face\s*\{[^}]*\}/gi);
+  return matches ? matches.join('\n') : '';
+};
+
 const sanitizeCssForSvg = (css: string): string => {
   if (!css) return '';
   // Strip any @font-face rules that contain non-data external URLs,
@@ -325,10 +330,13 @@ export const prepareMathSvgForExport = async (
       const pureSvg = renderKatexToPureSvg(code, targetTheme);
       if (pureSvg) {
         if (inlinedFontCss) {
-          return pureSvg.replace(
-            /<svg\b([^>]*)>/i,
-            (_match, attrs: string) => `<svg${attrs}><defs><style>${inlinedFontCss}</style></defs>`
-          );
+          const fontFaces = extractFontFaces(inlinedFontCss);
+          if (fontFaces) {
+            return pureSvg.replace(
+              /<svg\b([^>]*)>/i,
+              (_match, attrs: string) => `<svg${attrs}><defs><style><![CDATA[\n${fontFaces}\n]]></style></defs>`
+            );
+          }
         }
         return pureSvg;
       }
@@ -343,7 +351,10 @@ export const prepareMathSvgForExport = async (
     const themedCss = inlinedFontCss
       ? `${inlinedFontCss}\n.katex { color: ${formulaColor} !important; }`
       : `.katex { color: ${formulaColor} !important; }`;
-    return withColor.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => `<svg${attrs}><style>${themedCss}</style>`);
+    return withColor.replace(
+      /<svg\b([^>]*)>/i,
+      (_match, attrs: string) => `<svg${attrs}><style><![CDATA[\n${themedCss}\n]]></style>`
+    );
   } catch (err) {
     console.warn('[MathExport] prepareMathSvgForExport failed, returning raw SVG:', err);
     return svg;
