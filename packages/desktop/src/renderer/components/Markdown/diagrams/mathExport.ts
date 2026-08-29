@@ -65,12 +65,15 @@ export const renderKatexToPureSvg = (
       const paths = svg.querySelectorAll<SVGPathElement>('path');
       const x = isZeroRectEnv ? jsdomCursorX : rect.left - (baseRect.left - padding);
       const y = isZeroRectEnv ? padding : rect.top - (baseRect.top - padding);
-      const viewBox = svg.getAttribute('viewBox') || `0 0 ${rect.width || 20} ${rect.height || 20}`;
-      const preserveAspectRatio = svg.getAttribute('preserveAspectRatio') || 'xMidYMid meet';
+      const rawViewBox = svg.getAttribute('viewBox') || `0 0 ${rect.width || 20} ${rect.height || 20}`;
+      const viewBox = rawViewBox.replace(/"/g, '');
+      const preserveAspectRatio = (svg.getAttribute('preserveAspectRatio') || 'xMidYMid meet').replace(/"/g, '');
       const pathMarkup = Array.from(paths)
         .map((p) => {
-          const d = p.getAttribute('d');
-          return d ? `<path d="${d}" fill="${fillColor}" stroke="none"/>` : '';
+          const rawD = p.getAttribute('d');
+          if (!rawD) return '';
+          const d = rawD.replace(/"/g, '&quot;').replace(/\n/g, ' ');
+          return `<path d="${d}" fill="${fillColor}" stroke="none"/>`;
         })
         .join('');
       if (pathMarkup) {
@@ -102,7 +105,8 @@ export const renderKatexToPureSvg = (
 
       const style = window.getComputedStyle(parent);
       const parentFontSize = parseFloat(style.fontSize) || fontSize;
-      const fontFamily = style.fontFamily || 'KaTeX_Main, Times New Roman, serif';
+      const rawFontFamily = style.fontFamily || 'KaTeX_Main, Times New Roman, serif';
+      const fontFamily = rawFontFamily.replace(/"/g, "'");
       const fontStyle = style.fontStyle || 'normal';
       const fontWeight = style.fontWeight || 'normal';
 
@@ -120,7 +124,7 @@ export const renderKatexToPureSvg = (
         y = centerY.toFixed(2);
       }
 
-      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       if (isZeroRectEnv) {
         svgElements.push(
           `<text x="${x}" y="${y}" font-family="${fontFamily}" font-size="${parentFontSize}px" font-style="${fontStyle}" font-weight="${fontWeight}" fill="${fillColor}" stroke="none">${escaped}</text>`
