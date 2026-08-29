@@ -1429,5 +1429,7 @@
   "crossSessionMessageDesc": "Дозволяє агентам надсилати повідомлення до ваших інших розмов. Вимкнення також відключає згадку @@ у полі введення.",
   "crossSessionMessageDisabledBanner": "Повідомлення між розмовами вимкнено, згадка @@ недоступна.",
   "crossSessionMessageResume": "Увімкнути знову",
-  "crossSessionMessageUpdateFailed": "Не вдалося оновити налаштування повідомлень між розмовами"
+  "crossSessionMessageUpdateFailed": "Не вдалося оновити налаштування повідомлень між розмовами",
+  "previewDrawioUrl": "URL-адреса сервера Draw.io",
+  "previewDrawioUrlDesc": "Користувацька або локальна адреса сервера Draw.io. Залиште порожнім для офіційного сервісу (https://viewer.diagrams.net)."
 }

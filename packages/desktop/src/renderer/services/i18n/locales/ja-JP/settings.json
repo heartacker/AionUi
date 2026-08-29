@@ -1416,5 +1416,7 @@
   "crossSessionMessageDesc": "エージェントが他の会話にメッセージを送れるようにします。オフにすると入力欄の @@ 会話メンションも無効になります。",
   "crossSessionMessageDisabledBanner": "会話間メッセージはオフです。入力欄の @@ 会話メンションは使用できません。",
   "crossSessionMessageResume": "再度オンにする",
-  "crossSessionMessageUpdateFailed": "会話間メッセージ設定の更新に失敗しました"
+  "crossSessionMessageUpdateFailed": "会話間メッセージ設定の更新に失敗しました",
+  "previewDrawioUrl": "Draw.io サーバー URL",
+  "previewDrawioUrlDesc": "カスタムまたはセルフホストの Draw.io サーバー URL を設定します。空欄の場合は公式サービス (https://viewer.diagrams.net) が使用されます。"
 }

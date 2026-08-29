@@ -12,7 +12,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { usePreviewToolbarExtras } from '../../../context/PreviewToolbarExtrasContext';
 import { useThemeDetection } from '../../../hooks';
-import { buildDrawioViewerUrl, parseDrawioPages, type DrawioPage } from './drawioUtils';
+import { getClientBusinessSetting } from '@/renderer/services/clientBusinessSettings';
+import { buildDrawioViewerUrl, DEFAULT_DRAWIO_APP_URL, type DrawioPage, parseDrawioPages } from './drawioUtils';
 
 export interface DrawioViewerProps {
   content: string;
@@ -35,10 +36,24 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pages, setPages] = useState<DrawioPage[]>([]);
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [customDrawioUrl, setCustomDrawioUrl] = useState<string | undefined>();
   const [iframeKey, setIframeKey] = useState(0);
   const [messageApi, messageContextHolder] = Message.useMessage();
 
   const toolbarExtrasContext = usePreviewToolbarExtras();
+
+  // Load custom Draw.io server URL setting
+  useEffect(() => {
+    let active = true;
+    void getClientBusinessSetting('preview.drawioUrl')
+      .then((val) => {
+        if (active && val) setCustomDrawioUrl(val);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Parse pages on content change
   useEffect(() => {
@@ -179,18 +194,20 @@ export const DrawioViewer: React.FC<DrawioViewerProps> = ({ content, file_path, 
     }
   }, [fileRef, file_path]);
 
-  // Open in Diagrams.net online
+  // Open in Diagrams.net online or custom Draw.io web app
   const handleOpenDiagramsNet = useCallback(() => {
-    window.open('https://app.diagrams.net/', '_blank');
-  }, []);
+    const targetUrl = (customDrawioUrl || '').trim() || DEFAULT_DRAWIO_APP_URL;
+    window.open(targetUrl, '_blank');
+  }, [customDrawioUrl]);
 
   // Viewer iframe URL
   const viewerUrl = useMemo(() => {
     return buildDrawioViewerUrl({
       page: activePageIndex,
       theme: currentTheme === 'dark' ? 'dark' : 'light',
+      baseUrl: customDrawioUrl,
     });
-  }, [activePageIndex, currentTheme]);
+  }, [activePageIndex, currentTheme, customDrawioUrl]);
 
   // Inject toolbar extras
   useEffect(() => {

@@ -29,6 +29,11 @@ export type ClientBusinessSettingMap = {
    * distinct from any number the user could enter.
    */
   'preview.textSizeLimitMb': number | undefined;
+  /**
+   * Custom Draw.io server / web app URL.
+   * Defaults to https://viewer.diagrams.net when undefined.
+   */
+  'preview.drawioUrl': string | undefined;
 };
 
 export type ClientBusinessSettingKey = keyof ClientBusinessSettingMap;
