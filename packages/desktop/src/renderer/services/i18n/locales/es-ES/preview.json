@@ -209,5 +209,10 @@
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",
     "openInApp": "Abrir en Diagrams.net"
-  }
+  },
+  "drawio.editMode": "Edición visual",
+  "drawio.viewMode": "Ver",
+  "drawio.switchToView": "Cambiar al modo de vista",
+  "drawio.switchToEdit": "Cambiar al modo de edición visual",
+  "drawio.saveSuccess": "Diagrama Draw.io guardado"
 }

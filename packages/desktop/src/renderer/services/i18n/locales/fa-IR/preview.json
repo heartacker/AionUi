@@ -209,5 +209,10 @@
     "zoomIn": "بزرگ‌نمایی",
     "zoomOut": "کوچک‌نمایی",
     "openInApp": "باز کردن در Diagrams.net"
-  }
+  },
+  "drawio.editMode": "ویرایش بصری",
+  "drawio.viewMode": "مشاهده",
+  "drawio.switchToView": "تغییر به حالت مشاهده",
+  "drawio.switchToEdit": "تغییر به حالت ویرایش بصری",
+  "drawio.saveSuccess": "نمودار Draw.io ذخیره شد"
 }

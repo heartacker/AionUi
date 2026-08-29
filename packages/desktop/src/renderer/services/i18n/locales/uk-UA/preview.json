@@ -211,5 +211,10 @@
     "zoomIn": "Збільшити",
     "zoomOut": "Зменшити",
     "openInApp": "Відкрити в Diagrams.net"
-  }
+  },
+  "drawio.editMode": "Візуальний редактор",
+  "drawio.viewMode": "Перегляд",
+  "drawio.switchToView": "Перемкнути в режим перегляду",
+  "drawio.switchToEdit": "Перемкнути у візуальний редактор",
+  "drawio.saveSuccess": "Діаграму Draw.io збережено"
 }

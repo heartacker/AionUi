@@ -209,5 +209,10 @@
     "zoomIn": "放大",
     "zoomOut": "縮小",
     "openInApp": "在 Diagrams.net 中開啟"
-  }
+  },
+  "drawio.editMode": "視覺化編輯",
+  "drawio.viewMode": "唯讀預覽",
+  "drawio.switchToView": "切換為唯讀預覽模式",
+  "drawio.switchToEdit": "切換為視覺化編輯模式",
+  "drawio.saveSuccess": "Draw.io 圖表已儲存"
 }

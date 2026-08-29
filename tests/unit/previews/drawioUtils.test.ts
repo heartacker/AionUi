@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDrawioViewerUrl,
   decompressDrawioDiagram,
+  extractDrawioXmlFromPdf,
+  extractDrawioXmlFromPng,
   extractDrawioXmlFromSvg,
   isDrawioFile,
   parseDrawioPages,
@@ -22,6 +24,8 @@ describe('drawioUtils', () => {
       expect(isDrawioFile('pipeline.dio.xml')).toBe(true);
       expect(isDrawioFile('diagram.drawio.svg')).toBe(true);
       expect(isDrawioFile('export.drawio.png')).toBe(true);
+      expect(isDrawioFile('report.drawio.pdf')).toBe(true);
+      expect(isDrawioFile('slide.dio.pdf')).toBe(true);
       expect(isDrawioFile('UPPERCASE.DRAWIO')).toBe(true);
     });
 
@@ -44,6 +48,43 @@ describe('drawioUtils', () => {
     it('returns null for svg without content attribute', () => {
       const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>';
       expect(extractDrawioXmlFromSvg(svg)).toBeNull();
+    });
+  });
+
+  describe('extractDrawioXmlFromPng', () => {
+    it('extracts embedded mxfile from PNG tEXt chunk', () => {
+      const header = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+      const chunkText = Buffer.concat([
+        Buffer.from('mxfile\0'),
+        Buffer.from(encodeURIComponent('<mxfile><diagram name="PNG Diagram">test</diagram></mxfile>')),
+      ]);
+      const lenBuf = Buffer.alloc(4);
+      lenBuf.writeUInt32BE(chunkText.length);
+      const typeBuf = Buffer.from('tEXt');
+      const crcBuf = Buffer.alloc(4);
+      const png = Buffer.concat([header, lenBuf, typeBuf, chunkText, crcBuf]);
+
+      const extracted = extractDrawioXmlFromPng(png);
+      expect(extracted).toBe('<mxfile><diagram name="PNG Diagram">test</diagram></mxfile>');
+    });
+
+    it('returns null for regular PNG without mxfile chunk', () => {
+      const header = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+      expect(extractDrawioXmlFromPng(header)).toBeNull();
+    });
+  });
+
+  describe('extractDrawioXmlFromPdf', () => {
+    it('extracts embedded mxfile from PDF Subject info', () => {
+      const pdf =
+        '%PDF-1.4\n1 0 obj\n<< /Title (Diagram) /Subject (%3Cmxfile%3E%3Cdiagram%20name=%22PDF%20Page%22%3Etest%3C/diagram%3E%3C/mxfile%3E) >>\nendobj\n%%EOF';
+      const extracted = extractDrawioXmlFromPdf(pdf);
+      expect(extracted).toBe('<mxfile><diagram name="PDF Page">test</diagram></mxfile>');
+    });
+
+    it('returns null for PDF without mxfile info', () => {
+      const pdf = '%PDF-1.4\n1 0 obj\n<< /Title (Doc) >>\nendobj\n%%EOF';
+      expect(extractDrawioXmlFromPdf(pdf)).toBeNull();
     });
   });
 
@@ -98,21 +139,30 @@ describe('drawioUtils', () => {
   });
 
   describe('buildDrawioViewerUrl', () => {
-    it('builds viewer URL with default light theme and page 0', () => {
+    it('builds viewer URL with default edit mode', () => {
       const url = buildDrawioViewerUrl();
-      expect(url).toContain('https://viewer.diagrams.net/');
+      expect(url).toContain('https://embed.diagrams.net/');
       expect(url).toContain('page=0');
+      expect(url).toContain('saveAndExit=0');
       expect(url).not.toContain('&dark=1');
     });
 
+    it('builds viewer URL with view mode', () => {
+      const url = buildDrawioViewerUrl({ mode: 'view', page: 0 });
+      expect(url).toContain('https://viewer.diagrams.net/');
+      expect(url).toContain('page=0');
+      expect(url).toContain('highlight=0000ff');
+    });
+
     it('builds viewer URL with dark theme and specific page', () => {
-      const url = buildDrawioViewerUrl({ page: 2, theme: 'dark' });
+      const url = buildDrawioViewerUrl({ mode: 'view', page: 2, theme: 'dark' });
       expect(url).toContain('page=2');
       expect(url).toContain('&dark=1');
     });
 
     it('builds viewer URL with custom self-hosted baseUrl', () => {
       const url = buildDrawioViewerUrl({
+        mode: 'edit',
         page: 1,
         theme: 'light',
         baseUrl: 'https://drawio.internal.mycompany.com/',

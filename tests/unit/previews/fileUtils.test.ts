@@ -72,10 +72,21 @@ describe('fileUtils', () => {
       expect(getContentTypeByExtension('changes.diff')).toBe('diff');
     });
 
-    it('returns drawio for .drawio, .dio and compound .drawio.xml', () => {
+    it('returns drawio for .drawio, .dio and compound .drawio.* / .dio.* files', () => {
       expect(getContentTypeByExtension('diagram.drawio')).toBe('drawio');
       expect(getContentTypeByExtension('workflow.dio')).toBe('drawio');
       expect(getContentTypeByExtension('system.drawio.xml')).toBe('drawio');
+      expect(getContentTypeByExtension('pipeline.dio.xml')).toBe('drawio');
+      expect(getContentTypeByExtension('chart.drawio.png')).toBe('drawio');
+      expect(getContentTypeByExtension('chart.dio.png')).toBe('drawio');
+      expect(getContentTypeByExtension('doc.drawio.pdf')).toBe('drawio');
+      expect(getContentTypeByExtension('vector.drawio.svg')).toBe('drawio');
+    });
+
+    it('returns regular types for regular png, pdf, svg without drawio prefix', () => {
+      expect(getContentTypeByExtension('photo.png')).toBe('image');
+      expect(getContentTypeByExtension('document.pdf')).toBe('pdf');
+      expect(getContentTypeByExtension('icon.svg')).toBe('image');
     });
 
     it('returns code as default for unknown extension', () => {

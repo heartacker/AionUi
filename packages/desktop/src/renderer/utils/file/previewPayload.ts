@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { ChatFileRef } from '@/common/types/chatFile';
+import { chatFileRefPath, type ChatFileRef } from '@/common/types/chatFile';
 import type { PreviewContentType } from '@/common/types/office/preview';
 import { getClientBusinessSetting } from '@/renderer/services/clientBusinessSettings';
 
@@ -182,7 +182,10 @@ export const resolvePreviewPayload = async (
     return { ...base, content: '' };
   }
 
-  if (contentType === 'image') {
+  const filePath = chatFileRefPath(fileRef).toLowerCase();
+  const isBinaryDrawio = contentType === 'drawio' && (filePath.endsWith('.png') || filePath.endsWith('.pdf'));
+
+  if (contentType === 'image' || isBinaryDrawio) {
     // The backend prepends the data-URL prefix.
     const content = await ipcBridge.fs.readContent.invoke({ file: fileRef, encoding: 'dataurl' });
     return { ...base, content: content ?? '' };
