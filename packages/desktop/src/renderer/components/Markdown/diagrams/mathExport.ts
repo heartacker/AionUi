@@ -269,6 +269,18 @@ export const inlineFontUrls = async (css: string, baseUrl: string): Promise<stri
   return result;
 };
 
+const sanitizeCssForSvg = (css: string): string => {
+  if (!css) return '';
+  // Strip any @font-face rules that contain non-data external URLs,
+  // because external font URLs in SVGs trigger browser security blocks in Image()
+  return css.replace(/@font-face\s*\{[^}]*\}/gi, (rule) => {
+    if (rule.includes('url(') && !rule.includes('url(data:')) {
+      return '';
+    }
+    return rule;
+  });
+};
+
 // Light-theme primary text: exports rasterize onto a white backdrop (shared
 // diagram pipeline), so a dark-theme formula would otherwise be white-on-white.
 export const MATH_EXPORT_COLOR = 'rgb(29, 33, 41)';
@@ -294,7 +306,8 @@ export const prepareMathSvgForExport = async (
       try {
         const css = collectKatexCss(document.styleSheets);
         const baseUrl = document.baseURI || window.location.href;
-        return await inlineFontUrls(css, baseUrl);
+        const inlined = await inlineFontUrls(css, baseUrl);
+        return sanitizeCssForSvg(inlined);
       } catch (err) {
         console.warn('[MathExport] Failed to collect KaTeX CSS/fonts:', err);
         return '';
