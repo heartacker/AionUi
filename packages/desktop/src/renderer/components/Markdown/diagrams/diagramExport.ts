@@ -27,11 +27,19 @@ const PNG_SCALE = 2;
 export const stripSvgCodeFence = (raw: string): string => {
   let text = raw.trim();
   text = text
-    .replace(/^```(?:svg|xml|html)?\s*/i, '')
+    .replace(/^```(?:svg|xml|html|image)?\s*/i, '')
     .replace(/\s*```$/, '')
     .trim();
   text = text.replace(/^<\?xml[\s\S]*?\?>/i, '').trim();
   text = text.replace(/^<!DOCTYPE[\s\S]*?>/i, '').trim();
+
+  // If there is an <svg> tag inside surrounding HTML or comments, extract from the first <svg to </svg>
+  const svgStart = text.search(/<svg\b/i);
+  const svgEnd = text.toLowerCase().lastIndexOf('</svg>');
+  if (svgStart >= 0 && svgEnd > svgStart) {
+    text = text.slice(svgStart, svgEnd + 6).trim();
+  }
+
   return text;
 };
 

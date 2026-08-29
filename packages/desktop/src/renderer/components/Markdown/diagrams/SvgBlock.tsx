@@ -6,7 +6,7 @@
 
 import { Message } from '@arco-design/web-react';
 import { Copy, PreviewOpen, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs, vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -52,8 +52,7 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
   }, []);
 
   const { openPreview } = usePreviewContext();
-  const rawId = useId();
-  const cleanId = rawId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const blockIdRef = useRef(`svg-${Math.random().toString(36).slice(2, 10)}`);
 
   const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const preferredViewModeRef = useRef<'preview' | 'source'>('preview');
@@ -64,7 +63,14 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
     y: 0,
   });
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const dragStartRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
 
   const cleanSvg = useMemo(() => sanitizeAndFormatSvg(code), [code]);
   const responsivePreviewSvg = useMemo(() => withResponsiveSvg(cleanSvg), [cleanSvg]);
@@ -87,14 +93,14 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
     () =>
       cleanSvg && viewMode === 'preview'
         ? {
-            id: cleanId,
+            id: blockIdRef.current,
             svg: cleanSvg,
             code: stripSvgCodeFence(code),
             type: 'svg' as const,
             title: summary || t('preview.svgTitle'),
           }
         : null,
-    [cleanId, cleanSvg, code, summary, viewMode, t]
+    [cleanSvg, code, summary, viewMode, t]
   );
 
   const gallery = useDiagramGallery(galleryItem);
@@ -114,41 +120,48 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
 
   const resetZoom = () => setTransform({ scale: 1, x: 0, y: 0 });
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!enablePanZoom || e.button !== 0) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    dragStartRef.current = { x: e.clientX, y: e.clientY, tx: transform.x, ty: transform.y };
+  const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    dragStartRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: transform.x,
+      originY: transform.y,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
     setIsDragging(true);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !dragStartRef.current) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
+  const handlePanPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragStartRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (
+      !drag.moved &&
+      Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) < PAN_CLICK_THRESHOLD
+    ) {
+      return;
+    }
+    drag.moved = true;
     setTransform((prev) => ({
       ...prev,
-      x: dragStartRef.current!.tx + dx,
-      y: dragStartRef.current!.ty + dy,
+      x: drag.originX + (event.clientX - drag.startX),
+      y: drag.originY + (event.clientY - drag.startY),
     }));
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
-    const start = dragStartRef.current;
+  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragStartRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const isClick = !drag.moved && event.type === 'pointerup';
     dragStartRef.current = null;
-    setIsDragging(false);
-
-    if (start) {
-      const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
-      if (moved < PAN_CLICK_THRESHOLD) {
-        setTimeout(() => gallery.openGallery(cleanId), 0);
-      }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    setIsDragging(false);
+    if (isClick) setTimeout(() => gallery.openGallery(blockIdRef.current), 0);
   };
 
   const handleHeaderDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -156,7 +169,7 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
     const interactive = target.closest?.('button, [data-testid]');
     if (interactive && interactive !== event.currentTarget) return;
     if (viewMode !== 'preview') return;
-    gallery.openGallery(cleanId);
+    gallery.openGallery(blockIdRef.current);
   };
 
   const codeTheme = currentTheme === 'dark' ? vs2015 : vs;
@@ -164,7 +177,7 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
   return (
     <div
       ref={blockRef}
-      data-diagram-id={cleanId}
+      data-diagram-id={blockIdRef.current}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onClick={onClick}
@@ -321,9 +334,11 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
       {viewMode === 'preview' ? (
         <div
           data-testid='svg-diagram'
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
+          onPointerDown={enablePanZoom ? handlePanPointerDown : undefined}
+          onPointerMove={enablePanZoom ? handlePanPointerMove : undefined}
+          onPointerUp={enablePanZoom ? endPan : undefined}
+          onPointerCancel={enablePanZoom ? endPan : undefined}
+          onClick={!enablePanZoom ? () => gallery.openGallery(blockIdRef.current) : undefined}
           style={{
             padding: '16px',
             background: 'var(--bg-1)',
@@ -334,7 +349,6 @@ function SvgBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = f
             cursor: enablePanZoom ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
             touchAction: enablePanZoom ? 'none' : 'auto',
           }}
-          onClick={!enablePanZoom ? () => gallery.openGallery(cleanId) : undefined}
         >
           <div
             style={{
