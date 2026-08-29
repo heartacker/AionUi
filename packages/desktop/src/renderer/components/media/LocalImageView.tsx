@@ -1,17 +1,24 @@
 import { ipcBridge } from '@/common';
 import { joinPath } from '@/common/chat/chatLib';
 import { LoadingTwo } from '@icon-park/react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useConversationContextSafe } from '@renderer/hooks/context/ConversationContext';
 import { iconColors } from '@/renderer/styles/colors';
+import { useDiagramGallery } from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
+import DiagramZoomOverlay from '@/renderer/components/Markdown/diagrams/DiagramZoomOverlay';
+import { buildImageSnapshotSvg } from '@/renderer/components/Markdown/diagrams/diagramExport';
 
 const LocalImageView: React.FC<{
   src: string;
   alt: string;
   className?: string;
-}> = ({ src, alt, className }) => {
+  enableGallery?: boolean;
+}> = ({ src, alt, className, enableGallery = true }) => {
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState(src);
+  const rawId = useId();
+  const cleanId = rawId.replace(/[^a-zA-Z0-9_-]/g, '_');
+
   // Resolve relative image paths (e.g. ![](./chart.png)) against the conversation
   // workspace = the agent cwd, and pass it as the fs sandbox workspace. Outside a
   // conversation (settings markdown) there is no workspace, so the src is sent
@@ -34,6 +41,11 @@ const LocalImageView: React.FC<{
   }, [src, root]);
 
   useEffect(() => {
+    if (src.startsWith('http') || src.startsWith('data:') || src.startsWith('blob:')) {
+      setUrl(src);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     ipcBridge.fs.getImageBase64
       .invoke({ path: absolutePath, workspace: root || undefined })
@@ -50,7 +62,24 @@ const LocalImageView: React.FC<{
         });
         setLoading(false);
       });
-  }, [absolutePath]);
+  }, [absolutePath, src, root]);
+
+  const snapshotSvg = useMemo(() => (!loading && url ? buildImageSnapshotSvg(url) : ''), [loading, url]);
+  const galleryItem = useMemo(
+    () =>
+      enableGallery && snapshotSvg
+        ? {
+            id: cleanId,
+            svg: snapshotSvg,
+            code: url,
+            type: 'image' as const,
+            title: alt || undefined,
+          }
+        : null,
+    [enableGallery, cleanId, snapshotSvg, url, alt]
+  );
+  const gallery = useDiagramGallery(galleryItem);
+
   if (loading)
     return (
       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -65,7 +94,30 @@ const LocalImageView: React.FC<{
         <span>{alt}</span>
       </span>
     );
-  return <img src={url} alt={alt} className={className} />;
+
+  return (
+    <>
+      <img
+        data-diagram-id={cleanId}
+        src={url}
+        alt={alt}
+        className={className}
+        style={{ cursor: enableGallery ? 'pointer' : 'default', maxWidth: '100%' }}
+        onClick={enableGallery ? () => gallery.openGallery(cleanId) : undefined}
+        title={alt || undefined}
+      />
+      {gallery.localOpen && galleryItem && (
+        <DiagramZoomOverlay
+          items={[galleryItem]}
+          activeId={galleryItem.id}
+          onNavigate={() => {}}
+          onClose={() => gallery.openGallery('')}
+          ariaLabel={alt || 'Image'}
+          panelBackground='var(--bg-1)'
+        />
+      )}
+    </>
+  );
 };
 
 export default LocalImageView;
