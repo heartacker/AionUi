@@ -287,6 +287,7 @@ export const getSvgIntrinsicSize = (svg: string): DiagramSize | null => {
   const svgTag = /<svg\b[^>]*>/i.exec(svg)?.[0];
   if (!svgTag) return null;
 
+  // 1. Check viewBox attribute
   const viewBoxAttr = /viewBox\s*=\s*["']([^"']+)["']/i.exec(svgTag);
   if (viewBoxAttr) {
     const parts = viewBoxAttr[1]
@@ -298,13 +299,24 @@ export const getSvgIntrinsicSize = (svg: string): DiagramSize | null => {
     }
   }
 
-  const widthAttr = /width\s*=\s*["']([\d.]+)\s*(?:px)?["']/i.exec(svgTag);
-  const heightAttr = /height\s*=\s*["']([\d.]+)\s*(?:px)?["']/i.exec(svgTag);
+  // 2. Check width/height attributes (supports px, pt, mm, cm, in)
+  const widthAttr = /\bwidth\s*=\s*["']([\d.]+)\s*(?:px|pt|mm|cm|in)?["']/i.exec(svgTag);
+  const heightAttr = /\bheight\s*=\s*["']([\d.]+)\s*(?:px|pt|mm|cm|in)?["']/i.exec(svgTag);
   if (widthAttr && heightAttr) {
     const width = parseFloat(widthAttr[1]);
     const height = parseFloat(heightAttr[1]);
     if (width > 0 && height > 0) return { width, height };
   }
+
+  // 3. Check inline style width / height
+  const styleWidth = /width\s*:\s*([\d.]+)px/i.exec(svgTag);
+  const styleHeight = /height\s*:\s*([\d.]+)px/i.exec(svgTag);
+  if (styleWidth && styleHeight) {
+    const width = parseFloat(styleWidth[1]);
+    const height = parseFloat(styleHeight[1]);
+    if (width > 0 && height > 0) return { width, height };
+  }
+
   return null;
 };
 
@@ -316,15 +328,10 @@ export const ensureSvgViewBox = (svg: string): string => {
   if (!svg || !svg.includes('<svg')) return svg;
   return svg.replace(/<svg\b([^>]*)>/i, (tag, attrs: string) => {
     if (/\bviewBox\s*=/i.test(attrs)) return tag;
-    const widthMatch = /\bwidth\s*=\s*["']([\d.]+)(?:px)?["']/i.exec(attrs);
-    const heightMatch = /\bheight\s*=\s*["']([\d.]+)(?:px)?["']/i.exec(attrs);
-    if (widthMatch && heightMatch) {
-      const w = parseFloat(widthMatch[1]);
-      const h = parseFloat(heightMatch[1]);
-      if (w > 0 && h > 0) {
-        return `<svg${attrs} viewBox="0 0 ${w} ${h}">`;
-      }
+    const size = getSvgIntrinsicSize(tag);
+    if (size && size.width > 0 && size.height > 0) {
+      return `<svg${attrs} viewBox="0 0 ${size.width} ${size.height}">`;
     }
-    return tag;
+    return `<svg${attrs} viewBox="0 0 800 600">`;
   });
 };

@@ -284,8 +284,8 @@ function DiagramZoomOverlay({
       return;
     }
     const svgElement = overlayRef.current?.querySelector('svg');
-    const width = svgElement?.scrollWidth || svgElement?.clientWidth;
-    const height = svgElement?.scrollHeight || svgElement?.clientHeight;
+    const width = svgElement?.scrollWidth || svgElement?.clientWidth || 800;
+    const height = svgElement?.scrollHeight || svgElement?.clientHeight || 600;
     if (width && height) setBase({ width, height });
   }, [overlaySvg, base]);
 
@@ -609,7 +609,8 @@ function DiagramZoomOverlay({
     : {
         maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
         maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
-        width: isMobileOrTablet ? '100vw' : undefined,
+        width: isMobileOrTablet ? '100vw' : 'min(85vw, 900px)',
+        height: isMobileOrTablet ? '100vh' : 'min(80vh, 650px)',
         padding: isMobileOrTablet ? '0px' : '12px',
         borderRadius: isMobileOrTablet ? '0px' : '8px',
         boxSizing: 'border-box',
