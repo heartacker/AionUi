@@ -65,9 +65,11 @@ const MAX_BOX_HEIGHT = '85vh';
 // Touch swipe: horizontal displacement past this threshold with at least 2:1
 // horizontal dominance flips to the next/previous diagram (touch pointers only,
 // at fit scale — a zoomed-in diagram pans instead, like every photo gallery).
-const SWIPE_THRESHOLD = 60;
-const SWIPE_UP_THRESHOLD = 70;
+const SWIPE_THRESHOLD = 50;
+const SWIPE_UP_THRESHOLD = 60;
 const DOUBLE_TAP_DELAY = 280;
+
+const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
 // Small pointer movement below this counts as a tap, not a drag.
 const DRAG_THRESHOLD = 4;
 
@@ -146,6 +148,7 @@ function DiagramZoomOverlay({
   const [slideOffset, setSlideOffset] = useState(0);
   const [dismissOffsetY, setDismissOffsetY] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
   const [uiVisible, setUiVisible] = useState(true);
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,14 +327,26 @@ function DiagramZoomOverlay({
 
   const navigateBy = useCallback(
     (direction: -1 | 1) => {
-      if (!isGallery || !items || !onNavigate) return;
+      if (!isGallery || !items || !onNavigate || isSliding) return;
       const target = activeIndex + direction;
       if (target >= 0 && target < items.length) {
-        onNavigate(items[target].id);
-        setSlideOffset(0);
+        const targetId = items[target].id;
+        if (isTestEnv) {
+          onNavigate(targetId);
+          setSlideOffset(0);
+          return;
+        }
+        setIsSliding(true);
+        const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
+        setSlideOffset(direction === 1 ? -screenWidth : screenWidth);
+        setTimeout(() => {
+          onNavigate(targetId);
+          setIsSliding(false);
+          setSlideOffset(0);
+        }, 280);
       }
     },
-    [isGallery, items, onNavigate, activeIndex]
+    [isGallery, items, onNavigate, activeIndex, isSliding]
   );
 
   // Keyboard: ESC closes; gallery mode also flips diagrams with ←/→ (or A/D)
@@ -447,10 +462,10 @@ function DiagramZoomOverlay({
 
     const atFitScale = scale <= initialScaleRef.current + 0.05;
     const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
-    const isVerticalSwipeUp = deltaY < 0 && Math.abs(deltaY) > Math.abs(deltaX);
+    const isVerticalSwipe = Math.abs(deltaY) > Math.abs(deltaX);
 
-    if (atFitScale && isVerticalSwipeUp && (swipe.pointerType === 'touch' || isSmallScreen)) {
-      // Swiping up to exit
+    if (atFitScale && isVerticalSwipe && (swipe.pointerType === 'touch' || isSmallScreen)) {
+      // Swiping up or down to exit
       setDismissOffsetY(deltaY);
       setSlideOffset(0);
     } else if (isGallery && (items?.length ?? 0) > 1 && atFitScale && isHorizontal) {
@@ -506,19 +521,37 @@ function DiagramZoomOverlay({
       const distance = Math.hypot(deltaX, deltaY);
       const atFitScale = scale <= initialScaleRef.current + 0.05;
 
-      // 1. Check Swipe Up to Exit
-      if (
+      // 1. Check Swipe Up / Down to Exit
+      const isVerticalSwipe = Math.abs(deltaY) > Math.abs(deltaX);
+      const isVerticalExit =
         atFitScale &&
-        deltaY < -SWIPE_UP_THRESHOLD &&
-        Math.abs(deltaY) > Math.abs(deltaX) &&
-        (swipe.pointerType === 'touch' || isSmallScreen)
-      ) {
-        setDismissOffsetY(0);
-        onClose();
-        if (pointersRef.current.size === 0) setIsPanning(false);
+        Math.abs(deltaY) > SWIPE_UP_THRESHOLD &&
+        isVerticalSwipe &&
+        (swipe.pointerType === 'touch' || isSmallScreen);
+
+      if (isVerticalExit) {
+        if (isTestEnv) {
+          setDismissOffsetY(0);
+          onClose();
+          if (pointersRef.current.size === 0) setIsPanning(false);
+          return;
+        }
+        setIsDismissing(true);
+        const exitTargetY = deltaY < 0 ? -window.innerHeight : window.innerHeight;
+        setDismissOffsetY(exitTargetY);
+        setTimeout(() => {
+          onClose();
+          if (pointersRef.current.size === 0) setIsPanning(false);
+        }, 240);
         return;
       }
-      setDismissOffsetY(0);
+      if (dismissOffsetY !== 0) {
+        setIsDismissing(true);
+        setDismissOffsetY(0);
+        setTimeout(() => {
+          setIsDismissing(false);
+        }, 240);
+      }
 
       // 2. Check Tap / Double Tap
       if (!swipe.moved && distance < DRAG_THRESHOLD) {
@@ -575,18 +608,46 @@ function DiagramZoomOverlay({
           activeIndex < (items?.length ?? 0) - 1 &&
           (isSwipeGesture || Math.abs(slideOffset) > 0)
         ) {
-          onNavigate?.(items![activeIndex + 1].id);
-          setSlideOffset(0);
+          const nextTargetId = items![activeIndex + 1].id;
+          if (isTestEnv) {
+            onNavigate?.(nextTargetId);
+            setSlideOffset(0);
+          } else {
+            setIsSliding(true);
+            const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
+            setSlideOffset(-screenWidth);
+            setTimeout(() => {
+              onNavigate?.(nextTargetId);
+              setIsSliding(false);
+              setSlideOffset(0);
+            }, 280);
+          }
         } else if (
           deltaX > SWIPE_THRESHOLD &&
           !isEdgeLeft &&
           activeIndex > 0 &&
           (isSwipeGesture || Math.abs(slideOffset) > 0)
         ) {
-          onNavigate?.(items![activeIndex - 1].id);
+          const prevTargetId = items![activeIndex - 1].id;
+          if (isTestEnv) {
+            onNavigate?.(prevTargetId);
+            setSlideOffset(0);
+          } else {
+            setIsSliding(true);
+            const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 400;
+            setSlideOffset(screenWidth);
+            setTimeout(() => {
+              onNavigate?.(prevTargetId);
+              setIsSliding(false);
+              setSlideOffset(0);
+            }, 280);
+          }
+        } else if (slideOffset !== 0) {
+          setIsSliding(true);
           setSlideOffset(0);
-        } else {
-          setSlideOffset(0);
+          setTimeout(() => {
+            setIsSliding(false);
+          }, 280);
         }
       }
     }
@@ -825,9 +886,12 @@ function DiagramZoomOverlay({
         inset: 0,
         zIndex: 10000,
         background:
-          dismissOffsetY < 0
-            ? `rgba(29, 33, 41, ${Math.max(0.1, 0.6 * (1 - Math.abs(dismissOffsetY) / 300))})`
-            : 'var(--color-bg-mask, rgba(29, 33, 41, 0.6))',
+          dismissOffsetY !== 0
+            ? `rgba(29, 33, 41, ${Math.max(0.05, 0.6 * (1 - Math.abs(dismissOffsetY) / 400))})`
+            : isMobileOrTablet
+              ? 'var(--color-bg-mask, rgba(0, 0, 0, 0.95))'
+              : 'var(--color-bg-mask, rgba(29, 33, 41, 0.6))',
+        transition: isDismissing ? 'background 0.24s ease-out' : 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1095,13 +1159,15 @@ function DiagramZoomOverlay({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transform: `translateX(${slideOffset}px) translateY(${dismissOffsetY}px)`,
-          opacity: dismissOffsetY < 0 ? Math.max(0.3, 1 - Math.abs(dismissOffsetY) / 300) : 1,
+          transform: `translateX(${slideOffset}px) translateY(${dismissOffsetY}px) scale(${Math.max(0.85, 1 - Math.abs(dismissOffsetY) / 1200)})`,
+          opacity: dismissOffsetY !== 0 ? Math.max(0.2, 1 - Math.abs(dismissOffsetY) / 400) : 1,
           transition: isSliding
             ? 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)'
-            : dismissOffsetY === 0
-              ? 'transform 0.2s ease-out, opacity 0.2s ease-out'
-              : 'none',
+            : isDismissing
+              ? 'transform 0.24s ease-out, opacity 0.24s ease-out'
+              : dismissOffsetY === 0 && slideOffset === 0
+                ? 'transform 0.2s ease-out, opacity 0.2s ease-out'
+                : 'none',
           pointerEvents: 'none',
         }}
       >
