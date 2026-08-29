@@ -7,6 +7,14 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React, { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import DiagramZoomOverlay from '@/renderer/components/Markdown/diagrams/DiagramZoomOverlay';
+import type { DiagramItem } from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
+import {
+  DiagramGalleryProvider,
+  useDiagramGallery,
+} from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
+import { copySvgImage, saveDiagramImage } from '@/renderer/components/Markdown/diagrams/diagramExport';
+import { copyText } from '@/renderer/utils/ui/clipboard';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -47,15 +55,6 @@ vi.mock('@icon-park/react', () => ({
   Download: makeIcon('download'),
   Help: makeIcon('help'),
 }));
-
-import DiagramZoomOverlay from '@/renderer/components/Markdown/diagrams/DiagramZoomOverlay';
-import type { DiagramItem } from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
-import {
-  DiagramGalleryProvider,
-  useDiagramGallery,
-} from '@/renderer/components/Markdown/diagrams/DiagramGalleryContext';
-import { copySvgImage, saveDiagramImage } from '@/renderer/components/Markdown/diagrams/diagramExport';
-import { copyText } from '@/renderer/utils/ui/clipboard';
 
 // jsdom lacks the pointer capture API used by the drag handlers.
 beforeAll(() => {
@@ -591,25 +590,87 @@ describe('DiagramGalleryContext', () => {
     expect(screen.getByTestId('diagram-slide-next')).toBeInTheDocument();
   });
 
-  it('swallows trailing synthetic click on window when closing via backdrop tap', () => {
+  it('exits gallery on finger swipe up', () => {
+    stubMatchMedia({});
     const onClose = vi.fn();
     render(<DiagramZoomOverlay items={makeItems()} activeId='one' onNavigate={() => {}} onClose={onClose} />);
     const overlay = screen.getByTestId('diagram-zoom-overlay');
-    // Tap on backdrop without dragging
-    fireEvent.pointerDown(overlay, { pointerId: 99, pointerType: 'touch', button: 0, clientX: 10, clientY: 10 });
-    fireEvent.pointerUp(overlay, { pointerId: 99, pointerType: 'touch', clientX: 10, clientY: 10 });
-    expect(onClose).toHaveBeenCalledTimes(1);
 
-    // Behind element click is swallowed
-    const behindClicked = vi.fn();
-    const btn = document.createElement('button');
-    btn.onclick = behindClicked;
-    document.body.appendChild(btn);
+    // Swipe up on touch screen past SWIPE_UP_THRESHOLD (e.g. deltaY = -120)
+    fireEvent.pointerDown(overlay, { pointerId: 99, pointerType: 'touch', button: 0, clientX: 200, clientY: 300 });
+    fireEvent.pointerMove(overlay, { pointerId: 99, pointerType: 'touch', clientX: 202, clientY: 180 });
+    fireEvent.pointerUp(overlay, { pointerId: 99, pointerType: 'touch', clientX: 202, clientY: 180 });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('exits gallery on mobile back button (popstate event)', () => {
+    const onClose = vi.fn();
+    render(<DiagramZoomOverlay items={makeItems()} activeId='one' onNavigate={() => {}} onClose={onClose} />);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('zooms in on double tap and zooms out to fit scale on second double tap', async () => {
+    stubMatchMedia({});
+    render(<GalleryHarness activeId='one' />);
+    const content = screen.getByTestId('diagram-zoom-content');
+    const initialWidth = Number.parseFloat(content.style.width || '100');
+
+    // First double tap: zoom in
+    fireEvent.pointerDown(content, { pointerId: 101, pointerType: 'touch', button: 0, clientX: 200, clientY: 200 });
+    fireEvent.pointerUp(content, { pointerId: 101, pointerType: 'touch', clientX: 200, clientY: 200 });
+
+    fireEvent.pointerDown(content, { pointerId: 102, pointerType: 'touch', button: 0, clientX: 200, clientY: 200 });
+    fireEvent.pointerUp(content, { pointerId: 102, pointerType: 'touch', clientX: 200, clientY: 200 });
+
+    // Card should be scaled up larger than initial size
+    expect(Number.parseFloat(content.style.width)).toBeGreaterThan(initialWidth);
+
+    // Second double tap: reset to fit scale
+    fireEvent.pointerDown(content, { pointerId: 103, pointerType: 'touch', button: 0, clientX: 200, clientY: 200 });
+    fireEvent.pointerUp(content, { pointerId: 103, pointerType: 'touch', clientX: 200, clientY: 200 });
+
+    fireEvent.pointerDown(content, { pointerId: 104, pointerType: 'touch', button: 0, clientX: 200, clientY: 200 });
+    fireEvent.pointerUp(content, { pointerId: 104, pointerType: 'touch', clientX: 200, clientY: 200 });
+
+    expect(Number.parseFloat(content.style.width)).toBeCloseTo(initialWidth);
+    expect(content.style.transform).toBe('translate(0px, 0px)');
+  });
+
+  it('toggles UI visibility (topbar and footer) on single tap', async () => {
+    vi.useFakeTimers();
     try {
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      expect(behindClicked).not.toHaveBeenCalled();
+      stubMatchMedia({});
+      render(<GalleryHarness activeId='one' />);
+      const topbar = screen.getByTestId('diagram-overlay-topbar');
+      const footer = screen.getByTestId('diagram-gallery-footer');
+      expect(topbar.style.opacity).toBe('1');
+      expect(footer.style.opacity).toBe('1');
+
+      const content = screen.getByTestId('diagram-zoom-content');
+      fireEvent.pointerDown(content, { pointerId: 105, pointerType: 'touch', button: 0, clientX: 200, clientY: 200 });
+      fireEvent.pointerUp(content, { pointerId: 105, pointerType: 'touch', clientX: 200, clientY: 200 });
+
+      // Fast forward past DOUBLE_TAP_DELAY to trigger single tap
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(topbar.style.opacity).toBe('0');
+      expect(footer.style.opacity).toBe('0');
+
+      // Tap again to show
+      fireEvent.pointerDown(content, { pointerId: 106, pointerType: 'touch', button: 0, clientX: 200, clientY: 200 });
+      fireEvent.pointerUp(content, { pointerId: 106, pointerType: 'touch', clientX: 200, clientY: 200 });
+
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(topbar.style.opacity).toBe('1');
+      expect(footer.style.opacity).toBe('1');
     } finally {
-      btn.remove();
+      vi.useRealTimers();
     }
   });
 });

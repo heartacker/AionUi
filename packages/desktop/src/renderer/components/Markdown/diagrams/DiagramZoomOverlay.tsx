@@ -66,6 +66,8 @@ const MAX_BOX_HEIGHT = '85vh';
 // horizontal dominance flips to the next/previous diagram (touch pointers only,
 // at fit scale — a zoomed-in diagram pans instead, like every photo gallery).
 const SWIPE_THRESHOLD = 60;
+const SWIPE_UP_THRESHOLD = 70;
+const DOUBLE_TAP_DELAY = 280;
 // Small pointer movement below this counts as a tap, not a drag.
 const DRAG_THRESHOLD = 4;
 
@@ -142,7 +144,12 @@ function DiagramZoomOverlay({
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [slideOffset, setSlideOffset] = useState(0);
+  const [dismissOffsetY, setDismissOffsetY] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
+  const [uiVisible, setUiVisible] = useState(true);
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushedHistoryRef = useRef(false);
 
   // Multi-pointer gesture state: one pointer pans / may swipe-navigate (touch),
   // two pointers pinch-zoom around the moving midpoint.
@@ -214,6 +221,34 @@ function DiagramZoomOverlay({
       element.removeEventListener('touchmove', preventTouch);
     };
   }, []);
+
+  // Support mobile hardware/browser back button: push history state and close on popstate
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.history.pushState({ aionGalleryOpen: true }, '');
+      pushedHistoryRef.current = true;
+    } catch {
+      /* ignore */
+    }
+
+    const handlePopState = () => {
+      pushedHistoryRef.current = false;
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (pushedHistoryRef.current && window.history.state?.aionGalleryOpen) {
+        pushedHistoryRef.current = false;
+        try {
+          window.history.back();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [onClose]);
 
   // Gallery mode highlights one item of the registered stream; single mode is
   // the previous behavior with the svg handed in directly.
@@ -358,7 +393,7 @@ function DiagramZoomOverlay({
       target.getAttribute('data-testid') === 'diagram-slide-current';
 
     if (pointersRef.current.size === 1) {
-      // Single pointer: pan; a touch pointer is also a swipe-to-navigate candidate.
+      // Single pointer: pan; a touch pointer is also a swipe-to-navigate / swipe-up candidate.
       swipeRef.current = {
         pointerId: event.pointerId,
         pointerType: event.pointerType,
@@ -373,6 +408,7 @@ function DiagramZoomOverlay({
       // Second finger lands: switch from swipe to pinch, anchored on the current view.
       swipeRef.current = null;
       setSlideOffset(0);
+      setDismissOffsetY(0);
       const [first, second] = [...pointersRef.current.values()];
       pinchRef.current = {
         startDistance: Math.hypot(first.x - second.x, first.y - second.y) || 1,
@@ -411,15 +447,23 @@ function DiagramZoomOverlay({
 
     const atFitScale = scale <= initialScaleRef.current + 0.05;
     const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    const isVerticalSwipeUp = deltaY < 0 && Math.abs(deltaY) > Math.abs(deltaX);
 
-    if (isGallery && (items?.length ?? 0) > 1 && atFitScale && isHorizontal) {
+    if (atFitScale && isVerticalSwipeUp && (swipe.pointerType === 'touch' || isSmallScreen)) {
+      // Swiping up to exit
+      setDismissOffsetY(deltaY);
+      setSlideOffset(0);
+    } else if (isGallery && (items?.length ?? 0) > 1 && atFitScale && isHorizontal) {
       // Horizontal slide on track like a real mobile sliding window
+      setDismissOffsetY(0);
       const isEdgeLeft = deltaX > 0 && activeIndex === 0;
       const isEdgeRight = deltaX < 0 && activeIndex >= (items?.length ?? 1) - 1;
       const damped = isEdgeLeft || isEdgeRight ? deltaX * 0.35 : deltaX;
       setSlideOffset(damped);
     } else {
-      // Normal pan
+      // Normal pan when zoomed in
+      setDismissOffsetY(0);
+      setSlideOffset(0);
       setTranslate({ x: swipe.originX + deltaX, y: swipe.originY + deltaY });
     }
   };
@@ -454,7 +498,6 @@ function DiagramZoomOverlay({
       }
     }
 
-    // Check tap on backdrop vs swipe navigation
     const swipe = swipeRef.current;
     if (swipe && swipe.pointerId === event.pointerId) {
       swipeRef.current = null;
@@ -463,23 +506,64 @@ function DiagramZoomOverlay({
       const distance = Math.hypot(deltaX, deltaY);
       const atFitScale = scale <= initialScaleRef.current + 0.05;
 
-      if (!swipe.moved && distance < DRAG_THRESHOLD && swipe.isBackdrop) {
-        // Tapped directly on backdrop without dragging -> safely close without click-through
-        if (typeof window !== 'undefined') {
-          const swallow = (e: MouseEvent) => {
-            e.stopPropagation();
-            e.preventDefault();
-          };
-          window.addEventListener('click', swallow, { capture: true, once: true });
-          setTimeout(() => {
-            window.removeEventListener('click', swallow, { capture: true });
-          }, 350);
-        }
+      // 1. Check Swipe Up to Exit
+      if (
+        atFitScale &&
+        deltaY < -SWIPE_UP_THRESHOLD &&
+        Math.abs(deltaY) > Math.abs(deltaX) &&
+        (swipe.pointerType === 'touch' || isSmallScreen)
+      ) {
+        setDismissOffsetY(0);
         onClose();
         if (pointersRef.current.size === 0) setIsPanning(false);
         return;
       }
+      setDismissOffsetY(0);
 
+      // 2. Check Tap / Double Tap
+      if (!swipe.moved && distance < DRAG_THRESHOLD) {
+        const now = Date.now();
+        const prevTap = lastTapRef.current;
+        const isDoubleTap =
+          prevTap &&
+          now - prevTap.time < DOUBLE_TAP_DELAY &&
+          Math.hypot(event.clientX - prevTap.x, event.clientY - prevTap.y) < 35;
+
+        if (isDoubleTap) {
+          if (singleTapTimerRef.current) {
+            clearTimeout(singleTapTimerRef.current);
+            singleTapTimerRef.current = null;
+          }
+          lastTapRef.current = null;
+          if (scale > initialScaleRef.current + 0.1) {
+            // Already zoomed in -> zoom out to fit scale
+            resetView();
+          } else {
+            // Zoom in to 2.5x centered around tapped point
+            const targetScale = Math.min(MAX_SCALE, Math.max(initialScaleRef.current * 2.5, 2.5));
+            const originX = (window.innerWidth / 2 - event.clientX) * (targetScale / initialScaleRef.current - 1);
+            const originY = (window.innerHeight / 2 - event.clientY) * (targetScale / initialScaleRef.current - 1);
+            setScale(targetScale);
+            setTranslate({ x: originX, y: originY });
+          }
+          if (pointersRef.current.size === 0) setIsPanning(false);
+          return;
+        }
+
+        lastTapRef.current = { time: now, x: event.clientX, y: event.clientY };
+        if (singleTapTimerRef.current) {
+          clearTimeout(singleTapTimerRef.current);
+        }
+        singleTapTimerRef.current = setTimeout(() => {
+          setUiVisible((v) => !v);
+          singleTapTimerRef.current = null;
+        }, DOUBLE_TAP_DELAY);
+
+        if (pointersRef.current.size === 0) setIsPanning(false);
+        return;
+      }
+
+      // 3. Check Horizontal Carousel Switch
       if (isGallery && (items?.length ?? 0) > 1 && atFitScale) {
         const isEdgeLeft = deltaX > 0 && activeIndex === 0;
         const isEdgeRight = deltaX < 0 && activeIndex >= (items?.length ?? 1) - 1;
@@ -739,7 +823,10 @@ function DiagramZoomOverlay({
         position: 'fixed',
         inset: 0,
         zIndex: 10000,
-        background: 'var(--color-bg-mask, rgba(29, 33, 41, 0.6))',
+        background:
+          dismissOffsetY < 0
+            ? `rgba(29, 33, 41, ${Math.max(0.1, 0.6 * (1 - Math.abs(dismissOffsetY) / 300))})`
+            : 'var(--color-bg-mask, rgba(29, 33, 41, 0.6))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -767,6 +854,9 @@ function DiagramZoomOverlay({
           justifyContent: 'space-between',
           gap: isMobileOrTablet ? '6px' : '12px',
           pointerEvents: 'none',
+          opacity: uiVisible ? 1 : 0,
+          transform: uiVisible ? 'translateY(0)' : 'translateY(-24px)',
+          transition: 'opacity 0.22s ease-in-out, transform 0.22s ease-in-out',
         }}
       >
         <div
@@ -785,7 +875,7 @@ function DiagramZoomOverlay({
             color: 'var(--text-secondary)',
             fontSize: '13px',
             lineHeight: '20px',
-            pointerEvents: 'auto',
+            pointerEvents: uiVisible ? 'auto' : 'none',
             userSelect: 'none',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -810,7 +900,7 @@ function DiagramZoomOverlay({
             border: '1px solid var(--bg-3)',
             borderRadius: '8px',
             flexShrink: 0,
-            pointerEvents: 'auto',
+            pointerEvents: uiVisible ? 'auto' : 'none',
           }}
         >
           <div
@@ -1004,8 +1094,13 @@ function DiagramZoomOverlay({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transform: `translateX(${slideOffset}px)`,
-          transition: isSliding ? 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
+          transform: `translateX(${slideOffset}px) translateY(${dismissOffsetY}px)`,
+          opacity: dismissOffsetY < 0 ? Math.max(0.3, 1 - Math.abs(dismissOffsetY) / 300) : 1,
+          transition: isSliding
+            ? 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)'
+            : dismissOffsetY === 0
+              ? 'transform 0.2s ease-out, opacity 0.2s ease-out'
+              : 'none',
           pointerEvents: 'none',
         }}
       >
@@ -1122,7 +1217,9 @@ function DiagramZoomOverlay({
           position: 'fixed',
           bottom: isSmallScreen ? '8px' : '12px',
           left: '50%',
-          transform: 'translateX(-50%)',
+          transform: uiVisible ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(24px)',
+          opacity: uiVisible ? 1 : 0,
+          transition: 'opacity 0.22s ease-in-out, transform 0.22s ease-in-out',
           zIndex: 10001,
           display: 'flex',
           flexDirection: 'column',
@@ -1146,7 +1243,7 @@ function DiagramZoomOverlay({
               background: 'var(--bg-2)',
               border: '1px solid var(--bg-3)',
               borderRadius: '8px',
-              pointerEvents: 'auto',
+              pointerEvents: uiVisible ? 'auto' : 'none',
             }}
           >
             <button
@@ -1195,7 +1292,7 @@ function DiagramZoomOverlay({
               maxWidth: 'min(72vw, 880px)',
               overflowX: 'auto',
               padding: '4px',
-              pointerEvents: 'auto',
+              pointerEvents: uiVisible ? 'auto' : 'none',
             }}
           >
             {(items ?? []).map((item, index) => {
