@@ -11,7 +11,7 @@ import { useToolbarHover } from '@/renderer/components/Markdown/diagrams/useTool
 import { useTranslation } from 'react-i18next';
 import { Message } from '@arco-design/web-react';
 import { copyText } from '@/renderer/utils/ui/clipboard';
-import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
+import { useOptionalPreviewContext } from '@/renderer/pages/conversation/Preview/context/PreviewContext';
 
 const LocalImageView: React.FC<{
   src: string;
@@ -20,7 +20,7 @@ const LocalImageView: React.FC<{
   enableGallery?: boolean;
 }> = ({ src, alt, className, enableGallery = true }) => {
   const { t } = useTranslation();
-  const { openPreview } = usePreviewContext();
+  const previewContext = useOptionalPreviewContext();
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState(src);
   const rawId = useId();
@@ -111,7 +111,7 @@ const LocalImageView: React.FC<{
   };
 
   const handleOpenInPanel = () => {
-    openPreview(`![${alt}](${src})`, 'markdown', {
+    previewContext?.openPreview(`![${alt}](${src})`, 'markdown', {
       title: alt || 'Image Preview',
       editable: false,
     });
@@ -172,17 +172,19 @@ const LocalImageView: React.FC<{
             {label}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PreviewOpen
-              theme='outline'
-              size='18'
-              style={{ cursor: 'pointer', flexShrink: 0 }}
-              fill='var(--text-secondary)'
-              title={t('preview.openInPanelTooltip')}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenInPanel();
-              }}
-            />
+            {previewContext && (
+              <PreviewOpen
+                theme='outline'
+                size='18'
+                style={{ cursor: 'pointer', flexShrink: 0 }}
+                fill='var(--text-secondary)'
+                title={t('preview.openInPanelTooltip')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenInPanel();
+                }}
+              />
+            )}
             <Copy
               theme='outline'
               size='18'

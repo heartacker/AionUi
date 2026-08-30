@@ -292,4 +292,15 @@ describe('MarkdownViewer', () => {
     });
     expect(previewMocks.openPreview).not.toHaveBeenCalled();
   });
+
+  it('renders local image with file:// protocol or relative path', async () => {
+    const filePath = '/Users/demo/Desktop/chart.jpg';
+    vi.mocked(ipcBridge.fs.getImageBase64.invoke).mockResolvedValue('data:image/jpeg;base64,abc123');
+
+    render(<MarkdownViewer content={`![image](file://${filePath})`} file_path='/Users/demo/Desktop/test.md' />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'image' })).toHaveAttribute('src', 'data:image/jpeg;base64,abc123');
+    });
+  });
 });
