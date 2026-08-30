@@ -127,8 +127,12 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
           const src = decodeURIComponent(imgProps.src || '');
           return <LocalImageView src={src} alt={imgProps.alt || ''} className={imgProps.className} />;
         },
-        svg: (props: Record<string, unknown>) => {
-          return <SvgBlock {...(props as React.SVGProps<SVGSVGElement>)} />;
+        svg: ({ node: _node, className: cn, ...rest }: Record<string, unknown>) => {
+          // If the SVG is an inline icon (e.g. GitHub alert octicon), render it directly as a standard SVG element
+          if (typeof cn === 'string' && (cn.includes('octicon') || cn.includes('markdown-alert'))) {
+            return <svg {...(rest as React.SVGProps<SVGSVGElement>)} className={cn} />;
+          }
+          return <SvgBlock {...(rest as React.SVGProps<SVGSVGElement>)} className={cn as string} />;
         },
       }),
       [codeStyle, hiddenCodeCopyButton, handleLinkClick, onLocalFileLink]
