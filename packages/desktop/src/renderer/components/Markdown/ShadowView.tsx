@@ -195,6 +195,70 @@ export const createInitStyle = (
     color: var(--text-primary);
     margin: 16px 0;
   }
+  /* GitHub-style Markdown Alerts / Callouts */
+  .markdown-alert {
+    box-sizing: border-box;
+    margin: 16px 0;
+    padding: 12px 16px;
+    border-left: 4px solid var(--color-border-default, var(--bg-3));
+    border-radius: 6px;
+    background-color: var(--color-canvas-subtle, var(--bg-2));
+    color: var(--text-primary);
+  }
+  .markdown-alert > :first-child {
+    margin-top: 0;
+  }
+  .markdown-alert > :last-child {
+    margin-bottom: 0;
+  }
+  .markdown-alert .markdown-alert-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .markdown-alert .markdown-alert-title svg.octicon {
+    flex-shrink: 0;
+    fill: currentColor;
+  }
+  .markdown-alert.markdown-alert-note {
+    border-left-color: ${currentTheme === 'dark' ? '#58a6ff' : '#0969da'};
+    background-color: ${currentTheme === 'dark' ? 'rgba(56, 139, 253, 0.12)' : 'rgba(9, 105, 218, 0.08)'};
+  }
+  .markdown-alert.markdown-alert-note .markdown-alert-title {
+    color: ${currentTheme === 'dark' ? '#58a6ff' : '#0969da'};
+  }
+  .markdown-alert.markdown-alert-tip {
+    border-left-color: ${currentTheme === 'dark' ? '#3fb950' : '#1a7f37'};
+    background-color: ${currentTheme === 'dark' ? 'rgba(46, 160, 67, 0.12)' : 'rgba(26, 127, 55, 0.08)'};
+  }
+  .markdown-alert.markdown-alert-tip .markdown-alert-title {
+    color: ${currentTheme === 'dark' ? '#3fb950' : '#1a7f37'};
+  }
+  .markdown-alert.markdown-alert-important {
+    border-left-color: ${currentTheme === 'dark' ? '#a371f7' : '#8250df'};
+    background-color: ${currentTheme === 'dark' ? 'rgba(163, 113, 247, 0.12)' : 'rgba(130, 80, 223, 0.08)'};
+  }
+  .markdown-alert.markdown-alert-important .markdown-alert-title {
+    color: ${currentTheme === 'dark' ? '#a371f7' : '#8250df'};
+  }
+  .markdown-alert.markdown-alert-warning {
+    border-left-color: ${currentTheme === 'dark' ? '#d29922' : '#9a6700'};
+    background-color: ${currentTheme === 'dark' ? 'rgba(187, 128, 9, 0.12)' : 'rgba(154, 103, 0, 0.08)'};
+  }
+  .markdown-alert.markdown-alert-warning .markdown-alert-title {
+    color: ${currentTheme === 'dark' ? '#d29922' : '#9a6700'};
+  }
+  .markdown-alert.markdown-alert-caution {
+    border-left-color: ${currentTheme === 'dark' ? '#f85149' : '#cf222e'};
+    background-color: ${currentTheme === 'dark' ? 'rgba(248, 81, 73, 0.12)' : 'rgba(207, 34, 46, 0.08)'};
+  }
+  .markdown-alert.markdown-alert-caution .markdown-alert-title {
+    color: ${currentTheme === 'dark' ? '#f85149' : '#cf222e'};
+  }
   pre {
     max-width: 100%;
     overflow-x: auto;

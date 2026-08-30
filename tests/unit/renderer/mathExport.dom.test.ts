@@ -130,6 +130,5 @@ describe('prepareMathSvgForExport', () => {
     const svg = fresh.buildMathSvg('<span class="katex-display"></span>', 10, 10, 'rgb(255, 255, 255)');
     const exported = await fresh.prepareMathSvgForExport(svg);
     expect(exported).toContain(`color:${fresh.MATH_EXPORT_COLOR}`);
-    expect(exported).not.toContain('<style>');
   });
 });

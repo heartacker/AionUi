@@ -77,3 +77,49 @@ describe('preview markdown pipeline — raw HTML sanitization', () => {
     expect(c.querySelector('code')?.className).toContain('language-ts');
   });
 });
+
+describe('preview markdown pipeline — markdown alerts (callouts)', () => {
+  it('renders standard GitHub alert types (NOTE, TIP, IMPORTANT, WARNING, CAUTION)', () => {
+    const md = [
+      '> [!NOTE]',
+      '> This is a note.',
+      '',
+      '> [!TIP]',
+      '> This is a tip.',
+      '',
+      '> [!IMPORTANT]',
+      '> This is important.',
+      '',
+      '> [!WARNING]',
+      '> This is a warning.',
+      '',
+      '> [!CAUTION]',
+      '> This is a caution.',
+    ].join('\n');
+
+    const c = renderPreviewMarkdown(md);
+
+    const alerts = c.querySelectorAll('.markdown-alert');
+    expect(alerts).toHaveLength(5);
+
+    expect(c.querySelector('.markdown-alert.markdown-alert-note')).not.toBeNull();
+    expect(c.querySelector('.markdown-alert.markdown-alert-tip')).not.toBeNull();
+    expect(c.querySelector('.markdown-alert.markdown-alert-important')).not.toBeNull();
+    expect(c.querySelector('.markdown-alert.markdown-alert-warning')).not.toBeNull();
+    expect(c.querySelector('.markdown-alert.markdown-alert-caution')).not.toBeNull();
+
+    // Alert titles and SVG icons should be preserved after sanitization
+    const titles = c.querySelectorAll('.markdown-alert-title');
+    expect(titles).toHaveLength(5);
+    expect(c.querySelectorAll('.markdown-alert-title svg')).toHaveLength(5);
+  });
+
+  it('preserves standard blockquote when not an alert', () => {
+    const md = '> Just a normal blockquote without alert syntax.';
+    const c = renderPreviewMarkdown(md);
+
+    expect(c.querySelectorAll('.markdown-alert')).toHaveLength(0);
+    expect(c.querySelectorAll('blockquote')).toHaveLength(1);
+    expect(c.querySelector('blockquote')?.textContent).toContain('Just a normal blockquote');
+  });
+});
