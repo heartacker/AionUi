@@ -84,6 +84,107 @@
   margin: 16px 0;
 }
 
+/* GitHub-style Markdown Alerts / Callouts */
+.aionui-markdown .markdown-alert {
+  box-sizing: border-box;
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--color-border-default, var(--bg-3));
+  border-radius: 6px;
+  background-color: var(--color-canvas-subtle, var(--bg-2));
+  color: var(--text-primary);
+}
+.aionui-markdown .markdown-alert > :first-child {
+  margin-top: 0;
+}
+.aionui-markdown .markdown-alert > :last-child {
+  margin-bottom: 0;
+}
+.aionui-markdown .markdown-alert .markdown-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.aionui-markdown .markdown-alert .markdown-alert-title svg.octicon {
+  flex-shrink: 0;
+  fill: currentColor;
+}
+.aionui-markdown .markdown-alert.markdown-alert-note {
+  border-left-color: #0969da;
+  background-color: rgba(9, 105, 218, 0.08);
+}
+.aionui-markdown .markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: #0969da;
+}
+.aionui-markdown .markdown-alert.markdown-alert-tip {
+  border-left-color: #1a7f37;
+  background-color: rgba(26, 127, 55, 0.08);
+}
+.aionui-markdown .markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: #1a7f37;
+}
+.aionui-markdown .markdown-alert.markdown-alert-important {
+  border-left-color: #8250df;
+  background-color: rgba(130, 80, 223, 0.08);
+}
+.aionui-markdown .markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: #8250df;
+}
+.aionui-markdown .markdown-alert.markdown-alert-warning {
+  border-left-color: #9a6700;
+  background-color: rgba(154, 103, 0, 0.08);
+}
+.aionui-markdown .markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: #9a6700;
+}
+.aionui-markdown .markdown-alert.markdown-alert-caution {
+  border-left-color: #cf222e;
+  background-color: rgba(207, 34, 46, 0.08);
+}
+.aionui-markdown .markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: #cf222e;
+}
+
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-note {
+  border-left-color: #58a6ff;
+  background-color: rgba(56, 139, 253, 0.12);
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: #58a6ff;
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-tip {
+  border-left-color: #3fb950;
+  background-color: rgba(46, 160, 67, 0.12);
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: #3fb950;
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-important {
+  border-left-color: #a371f7;
+  background-color: rgba(163, 113, 247, 0.12);
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: #a371f7;
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-warning {
+  border-left-color: #d29922;
+  background-color: rgba(187, 128, 9, 0.12);
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: #d29922;
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-caution {
+  border-left-color: #f85149;
+  background-color: rgba(248, 81, 73, 0.12);
+}
+[data-theme='dark'] .aionui-markdown .markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: #f85149;
+}
+
 /* Inline code (not inside a highlighted code block) */
 .aionui-markdown :where(code):not(:where(pre code)) {
   background: var(--bg-3);

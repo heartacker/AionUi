@@ -9,6 +9,7 @@ import type { Options as ReactMarkdownOptions } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import { remarkAlert } from 'remark-github-blockquote-alert';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -18,7 +19,7 @@ import remarkMath from 'remark-math';
  * `$...$` / `$$...$$` math, and hard line breaks. Kept as a single module-level
  * constant so all renderers stay in sync and React sees a stable reference.
  */
-export const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkMath, remarkBreaks];
+export const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkMath, remarkBreaks, remarkAlert];
 
 /**
  * Rehype pipeline for surfaces that render raw HTML embedded in semi-trusted
@@ -41,6 +42,16 @@ export const SANITIZED_HTML_REHYPE_PLUGINS: ReactMarkdownOptions['rehypePlugins'
     rehypeSanitize,
     {
       ...defaultSchema,
+      tagNames: [...(defaultSchema.tagNames || []), 'svg', 'path'],
+      attributes: {
+        ...defaultSchema.attributes,
+        div: [...(defaultSchema.attributes?.div || []), 'className', 'dir'],
+        p: [...(defaultSchema.attributes?.p || []), 'className', 'dir'],
+        span: [...(defaultSchema.attributes?.span || []), 'className'],
+        svg: ['className', 'viewBox', 'width', 'height', 'ariaHidden', 'aria-hidden', 'role', 'focusable', 'fill'],
+        path: ['d', 'fill', 'fillRule', 'clipRule'],
+        '*': [...(defaultSchema.attributes?.['*'] || []), 'className', 'dir'],
+      },
       protocols: {
         ...defaultSchema.protocols,
         src: [...(defaultSchema.protocols?.src || []), 'data', 'file'],
