@@ -15,7 +15,7 @@ import waveSkinDefault from 'wavedrom/skins/default.js';
 
 import { Message } from '@arco-design/web-react';
 import { Copy, PreviewOpen, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
-import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
+import { useOptionalPreviewContext } from '@/renderer/pages/conversation/Preview/context/PreviewContext';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
@@ -163,9 +163,11 @@ const renderWaveSvg = (code: string, isDark: boolean, index: number): string | n
 
 function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = false }: WavedromBlockProps) {
   const { t } = useTranslation();
-  const { openPreview } = usePreviewContext();
-  const preferredViewModeRef = useRef<'preview' | 'source' | null>(null);
-  const [viewMode, setViewMode] = useState<'preview' | 'source'>('source');
+  const preview = useOptionalPreviewContext();
+  const openPreview = preview?.openPreview;
+  const showOpenInPanel = showOpenInPanelButton && typeof openPreview === 'function';
+  const preferredViewModeRef = useRef<'preview' | 'source'>('preview');
+  const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [debouncedCode, setDebouncedCode] = useState(code);
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>(() => {
     return (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light';
@@ -292,9 +294,19 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
     }));
   const resetTransform = () => setTransform({ scale: 1, x: 0, y: 0 });
 
+  const isZoomedIn = transform.scale > 1.05;
+
   const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
-    event.preventDefault();
+    if (isZoomedIn) {
+      event.preventDefault();
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+      setIsPanning(true);
+    }
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -303,13 +315,12 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
       originY: transform.y,
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsPanning(true);
   };
 
   const handlePanPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!isZoomedIn) return;
     // Stay in "click" territory until the pointer travels past the threshold so
     // a plain click opens the zoom overlay instead of nudging the diagram.
     if (
@@ -331,8 +342,12 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
     if (!drag || drag.pointerId !== event.pointerId) return;
     const isClick = !drag.moved && event.type === 'pointerup';
     dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      /* ignore */
     }
     setIsPanning(false);
     // Open one tick after pointerup: the browser dispatches the tap's click
@@ -464,7 +479,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
                 />
               </>
             )}
-            {showOpenInPanelButton && (
+            {showOpenInPanel && (
               <PreviewOpen
                 data-testid='wavedrom-open-in-panel'
                 theme='outline'
@@ -473,7 +488,7 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
                 fill='var(--text-secondary)'
                 title={t('preview.openInPanelTooltip')}
                 onClick={() => {
-                  openPreview(`\`\`\`wavedrom\n${code}\n\`\`\``, 'markdown', {
+                  openPreview?.(`\`\`\`wavedrom\n${code}\n\`\`\``, 'markdown', {
                     title: previewTitle,
                     editable: false,
                   });
@@ -508,8 +523,8 @@ function WavedromBlock({ code, style, showOpenInPanelButton = true, enablePanZoo
                 padding: '12px',
                 position: 'relative',
                 overflow: 'hidden',
-                cursor: isPanning ? 'grabbing' : 'grab',
-                touchAction: 'none',
+                cursor: isPanning ? 'grabbing' : isZoomedIn ? 'grab' : 'zoom-in',
+                touchAction: isZoomedIn ? 'none' : 'pan-y',
               }}
               onPointerDown={handlePanPointerDown}
               onPointerMove={handlePanPointerMove}

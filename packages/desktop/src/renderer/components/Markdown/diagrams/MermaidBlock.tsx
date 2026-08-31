@@ -11,13 +11,21 @@ import { vs, vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { Message } from '@arco-design/web-react';
 import { Copy, PreviewOpen, Refresh, ZoomIn, ZoomOut } from '@icon-park/react';
-import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
+import { useOptionalPreviewContext } from '@/renderer/pages/conversation/Preview/context/PreviewContext';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
 import { useToolbarHover } from './useToolbarHover';
 import { getDiagramSummary, withResponsiveSvg } from '../markdownUtils';
+
+export const stripMermaidCodeFence = (source: string): string => {
+  let cleaned = source.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[^\r\n]*\r?\n/, '').replace(/\r?\n```\s*$/, '');
+  }
+  return cleaned.trim();
+};
 
 type MermaidBlockProps = {
   code: string;
@@ -54,14 +62,18 @@ const ensureMermaidInitialized = (theme: 'light' | 'dark') => {
   initializedTheme = theme;
 };
 
+let mermaidRenderCounter = 0;
+
 function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = false }: MermaidBlockProps) {
   const { t } = useTranslation();
-  const { openPreview } = usePreviewContext();
+  const preview = useOptionalPreviewContext();
+  const openPreview = preview?.openPreview;
+  const showOpenInPanel = showOpenInPanelButton && typeof openPreview === 'function';
   const blockIdRef = useRef(`mermaid-${Math.random().toString(36).slice(2, 10)}`);
-  const preferredViewModeRef = useRef<'preview' | 'source' | null>(null);
+  const preferredViewModeRef = useRef<'preview' | 'source'>('preview');
   const [svg, setSvg] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
-  const [viewMode, setViewMode] = useState<'preview' | 'source'>('source');
+  const [viewMode, setViewMode] = useState<'preview' | 'source'>('preview');
   const [debouncedCode, setDebouncedCode] = useState(code);
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>(() => {
     return (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light';
@@ -91,9 +103,19 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
     }));
   const resetTransform = () => setTransform({ scale: 1, x: 0, y: 0 });
 
+  const isZoomedIn = transform.scale > 1.05;
+
   const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
-    event.preventDefault();
+    if (isZoomedIn) {
+      event.preventDefault();
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+      setIsPanning(true);
+    }
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -102,13 +124,12 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
       originY: transform.y,
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsPanning(true);
   };
 
   const handlePanPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!isZoomedIn) return;
     // Stay in "click" territory until the pointer travels past the threshold so
     // a plain click opens the zoom overlay instead of nudging the diagram.
     if (
@@ -130,8 +151,12 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
     if (!drag || drag.pointerId !== event.pointerId) return;
     const isClick = !drag.moved && event.type === 'pointerup';
     dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      /* ignore */
     }
     setIsPanning(false);
     // Open one tick after pointerup: the browser dispatches the tap's click
@@ -164,7 +189,7 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
 
   useEffect(() => {
     let cancelled = false;
-    const source = debouncedCode.trim();
+    const source = stripMermaidCodeFence(debouncedCode);
 
     if (!source) {
       setSvg(null);
@@ -182,7 +207,8 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
       try {
         ensureMermaidInitialized(currentTheme);
 
-        const { svg: renderedSvg } = await mermaid.render(`${blockIdRef.current}-${Date.now()}`, source);
+        const renderId = `mermaid-${blockIdRef.current.replace(/[^a-zA-Z0-9_-]/g, '')}-${++mermaidRenderCounter}`;
+        const { svg: renderedSvg } = await mermaid.render(renderId, source);
 
         if (!cancelled) {
           const withVisibleOverflow = renderedSvg.replace(/<foreignObject\b([^>]*)>/gi, (match, attrs) => {
@@ -202,7 +228,8 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
           setIsRendering(false);
           setViewMode(preferredViewModeRef.current === 'source' ? 'source' : 'preview');
         }
-      } catch {
+      } catch (err) {
+        console.error('[MermaidBlock] Mermaid render error:', err);
         if (!cancelled) {
           setSvg(null);
           setIsRendering(false);
@@ -379,7 +406,7 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
                 />
               </>
             )}
-            {showOpenInPanelButton && (
+            {showOpenInPanel && (
               <PreviewOpen
                 data-testid='mermaid-open-in-panel'
                 theme='outline'
@@ -388,7 +415,7 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
                 fill='var(--text-secondary)'
                 title={t('preview.openInPanelTooltip')}
                 onClick={() => {
-                  openPreview(`\`\`\`mermaid\n${code}\n\`\`\``, 'markdown', {
+                  openPreview?.(`\`\`\`mermaid\n${code}\n\`\`\``, 'markdown', {
                     title: previewTitle,
                     editable: false,
                   });
@@ -423,8 +450,8 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
                 padding: '12px',
                 position: 'relative',
                 overflow: 'hidden',
-                cursor: isPanning ? 'grabbing' : 'grab',
-                touchAction: 'none',
+                cursor: isPanning ? 'grabbing' : isZoomedIn ? 'grab' : 'zoom-in',
+                touchAction: isZoomedIn ? 'none' : 'pan-y',
               }}
               onPointerDown={handlePanPointerDown}
               onPointerMove={handlePanPointerMove}

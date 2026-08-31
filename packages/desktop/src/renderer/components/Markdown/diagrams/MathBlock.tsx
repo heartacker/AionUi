@@ -167,9 +167,19 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
     }));
   const resetTransform = () => setTransform({ scale: 1, x: 0, y: 0 });
 
+  const isZoomedIn = transform.scale > 1.05;
+
   const handlePanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
-    event.preventDefault();
+    if (isZoomedIn) {
+      event.preventDefault();
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* ignore */
+      }
+      setIsPanning(true);
+    }
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -178,13 +188,12 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
       originY: transform.y,
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setIsPanning(true);
   };
 
   const handlePanPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!isZoomedIn) return;
     if (
       !drag.moved &&
       Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY) < PAN_CLICK_THRESHOLD
@@ -204,8 +213,12 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
     if (!drag || drag.pointerId !== event.pointerId) return;
     const isClick = !drag.moved && event.type === 'pointerup';
     dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      /* ignore */
     }
     setIsPanning(false);
     // Deferred one tick so the tap's click event cannot land on the freshly
@@ -426,8 +439,8 @@ function MathBlock({ code, style, showOpenInPanelButton = true, enablePanZoom = 
                 padding: '12px',
                 position: 'relative',
                 overflow: 'hidden',
-                cursor: isPanning ? 'grabbing' : 'grab',
-                touchAction: 'none',
+                cursor: isPanning ? 'grabbing' : isZoomedIn ? 'grab' : 'zoom-in',
+                touchAction: isZoomedIn ? 'none' : 'pan-y',
               }}
               onPointerDown={handlePanPointerDown}
               onPointerMove={handlePanPointerMove}
