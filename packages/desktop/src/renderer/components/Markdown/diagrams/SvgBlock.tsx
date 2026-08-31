@@ -11,7 +11,7 @@ import { vs, vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { Copy, PreviewOpen } from '@icon-park/react';
 import { Message } from '@arco-design/web-react';
 import { copyText } from '@/renderer/utils/ui/clipboard';
-import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
+import { useOptionalPreviewContext } from '@/renderer/pages/conversation/Preview/context/PreviewContext';
 import { useDiagramGallery } from './DiagramGalleryContext';
 import DiagramZoomOverlay from './DiagramZoomOverlay';
 import { useToolbarHover } from './useToolbarHover';
@@ -25,7 +25,8 @@ type SvgBlockProps = React.SVGProps<SVGSVGElement> & {
 
 export const SvgBlock: React.FC<SvgBlockProps> = ({ children, code, style, enablePanZoom: _epz, ...rest }) => {
   const { t } = useTranslation();
-  const { openPreview } = usePreviewContext();
+  const preview = useOptionalPreviewContext();
+  const openPreview = preview?.openPreview;
   const blockIdRef = useRef(`svg-${Math.random().toString(36).slice(2, 10)}`);
   const svgRef = useRef<SVGSVGElement>(null);
   const preferredViewModeRef = useRef<'preview' | 'source'>('preview');
@@ -84,7 +85,7 @@ export const SvgBlock: React.FC<SvgBlockProps> = ({ children, code, style, enabl
   };
 
   const handleOpenInPanel = () => {
-    openPreview(`\`\`\`xml\n${rawSource || svgString}\n\`\`\``, 'markdown', {
+    openPreview?.(`\`\`\`xml\n${rawSource || svgString}\n\`\`\``, 'markdown', {
       title: 'SVG Preview',
       editable: false,
     });

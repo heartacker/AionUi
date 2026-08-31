@@ -177,17 +177,26 @@ describe('MermaidBlock pan/zoom', () => {
     await vi.waitFor(() => expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument());
   });
 
-  it('pans instead of opening the overlay when the pointer drags past the threshold', async () => {
+  it('does not pan when at default scale, but pans when zoomed in past 1x', async () => {
     render(<MermaidBlock code={'graph TD; A-->B'} enablePanZoom />);
     const diagram = await screen.findByTestId('mermaid-diagram');
+    const inner = diagram.firstElementChild as HTMLElement;
 
+    // At default 1x scale: dragging does not pan
     fireEvent.pointerDown(diagram, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(diagram, { pointerId: 1, clientX: 60, clientY: 40 });
     fireEvent.pointerUp(diagram, { pointerId: 1 });
+    expect(inner.style.transform).toContain('translate(0px, 0px) scale(1)');
 
-    const inner = diagram.firstElementChild as HTMLElement;
+    // Zoom in with zoom button
+    fireEvent.click(screen.getByTestId('mermaid-zoom-in'));
+    expect(inner.style.transform).toContain('scale(1.25)');
+
+    // Now zoomed in: dragging pans the diagram
+    fireEvent.pointerDown(diagram, { pointerId: 2, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(diagram, { pointerId: 2, clientX: 60, clientY: 40 });
+    fireEvent.pointerUp(diagram, { pointerId: 2 });
     expect(inner.style.transform).toContain('translate(50px, 30px)');
-    expect(screen.queryByTestId('mermaid-zoom-overlay')).toBeNull();
   });
   it('hides the header actions until the block is hovered', async () => {
     stubMatchMedia({});
