@@ -105,7 +105,7 @@
         "tiny-csrf": "^1.1.6",
         "turndown": "^7.2.4",
         "turndown-plugin-gfm": "^1.0.2",
-        "wavedrom": "^3.6.2",
+        "wavedrom": "^3.7.0",
         "web-tree-sitter": "^0.25.10",
         "ws": "^8.21.3",
         "xlsx-republish": "^0.20.3",
@@ -2442,7 +2442,7 @@
 
     "log-update": ["log-update@6.1.0", "", { "dependencies": { "ansi-escapes": "^7.0.0", "cli-cursor": "^5.0.0", "slice-ansi": "^7.1.0", "strip-ansi": "^7.1.0", "wrap-ansi": "^9.0.0" } }, "sha512-9ie8ItPR6tjY5uYJh8K/Zrv/RMZ5VOlOWvtZdEHYSTFKZfIBPQa9tOAEeAWhd+AnIneLJ22w5fjOYtoutpWq5w=="],
 
-    "logidrom": ["logidrom@0.3.1", "", { "dependencies": { "estraverse": "^5.1.0", "tspan": "^0.4.0" } }, "sha512-B1Rjay3Ye/JcythUjMt+KLiLIwOjnMJN1M5BRbDgNMsJhmn7yApbx6n1rw7cT3Fi/NA77HDM+y3y1nXvKQVB9Q=="],
+    "logidrom": ["logidrom@1.0.0", "", { "dependencies": { "estraverse": "^5.1.0", "tspan": "^0.4.0" } }, "sha512-U/EJCm08bYI6N1wY59/9kwFoYGBiJFTc3CPKIcyNpQgBHM4ZsHbQ/tt7ZO7Q0YE4jS9Ms03ni690qH4uSVWhFw=="],
 
     "long": ["long@5.3.2", "", {}, "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA=="],
 
@@ -3316,7 +3316,7 @@
 
     "walker": ["walker@1.0.8", "", { "dependencies": { "makeerror": "1.0.12" } }, "sha512-ts/8E8l5b7kY0vlWLewOkDXMmPdLcVV4GmOQLyxuSswIJsweeFZtAsMF7k1Nszz+TYBQrlYRmzOnr398y1JemQ=="],
 
-    "wavedrom": ["wavedrom@3.6.2", "", { "dependencies": { "bit-field": "^1.9.0", "json5": "^2.2.3", "logidrom": "^0.3.1", "onml": "^2.1.0", "tspan": "^0.4.0" }, "bin": { "wavedrom": "bin/cli.js" } }, "sha512-Z9Kvbj74IlqrDK/5rw5imTYSrNkwurSbmJsdj8GONRXC4rXe/i8mEMDuOC6DrWzMxxNRILKFiPLAB81eJH62Qg=="],
+    "wavedrom": ["wavedrom@3.7.0", "", { "dependencies": { "bit-field": "^1.9.0", "json5": "^2.2.3", "logidrom": "^1.0.0", "onml": "^2.1.0", "tspan": "^0.4.0" }, "bin": { "wavedrom": "bin/cli.js" } }, "sha512-2dd4xLooh+bvkJ4iAudM3lkvHF11MLznAdLgR7QYX2Mfvtu7Jf2yVZsr29l6Z74n8ONso30UKPgRnr3gTFnf3Q=="],
 
     "web-namespaces": ["web-namespaces@2.0.1", "", {}, "sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ=="],
 
