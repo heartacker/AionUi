@@ -23,8 +23,9 @@ vi.mock('wavedrom/skins/dark.js', () => ({
   default: { dark: { name: 'dark-skin' } },
 }));
 
-vi.mock('@/renderer/pages/conversation/Preview', () => ({
+vi.mock('@/renderer/pages/conversation/Preview/context/PreviewContext', () => ({
   usePreviewContext: () => ({ openPreview: vi.fn() }),
+  useOptionalPreviewContext: () => ({ openPreview: vi.fn() }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -180,9 +181,13 @@ describe('WavedromBlock pan/zoom', () => {
     await vi.waitFor(() => expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument());
   });
 
-  it('pans instead of opening the overlay when the pointer drags past the threshold', () => {
+  it('pans instead of opening the overlay when the pointer drags past the threshold while zoomed in', () => {
     render(<WavedromBlock code={VALID_WAVEJSON} enablePanZoom />);
     const diagram = screen.getByTestId('wavedrom-diagram');
+
+    // Dragging is only enabled once the diagram is zoomed in (in-message
+    // blocks must stay scrollable at scale 1).
+    fireEvent.click(screen.getByTestId('wavedrom-zoom-in'));
 
     fireEvent.pointerDown(diagram, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
     fireEvent.pointerMove(diagram, { pointerId: 1, clientX: 60, clientY: 40 });
@@ -191,6 +196,21 @@ describe('WavedromBlock pan/zoom', () => {
     const inner = diagram.firstElementChild as HTMLElement;
     expect(inner.style.transform).toContain('translate(50px, 30px)');
     expect(screen.queryByTestId('diagram-zoom-overlay')).toBeNull();
+  });
+
+  it('opens the overlay when the pointer drags past the threshold at scale 1 (no panning)', async () => {
+    render(<WavedromBlock code={VALID_WAVEJSON} enablePanZoom />);
+    const diagram = screen.getByTestId('wavedrom-diagram');
+
+    fireEvent.pointerDown(diagram, { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(diagram, { pointerId: 1, clientX: 60, clientY: 40 });
+    fireEvent.pointerUp(diagram, { pointerId: 1 });
+
+    const inner = diagram.firstElementChild as HTMLElement;
+    expect(inner.style.transform).toContain('translate(0px, 0px) scale(1)');
+    // The drag is treated as a click: the overlay opens one tick after
+    // pointerup so the tap's trailing click lands on the block.
+    await vi.waitFor(() => expect(screen.getByTestId('diagram-zoom-overlay')).toBeInTheDocument());
   });
 
   it('closes the zoom overlay via its close button', () => {
