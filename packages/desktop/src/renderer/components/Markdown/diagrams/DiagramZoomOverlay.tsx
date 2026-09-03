@@ -112,6 +112,28 @@ const stripInlineMaxWidth = (svg: string): string => {
 };
 
 /**
+ * Synchronously calculate diagram natural size and contain-fit scale against viewport.
+ */
+export const computeDiagramFit = (
+  svg: string,
+  hasThumbs: boolean,
+  isMobileOrTablet: boolean
+): { base: DiagramSize; fitScale: number } => {
+  const intrinsic = getSvgIntrinsicSize(svg) ?? { width: 800, height: 600 };
+  if (typeof window === 'undefined') {
+    return { base: intrinsic, fitScale: 1 };
+  }
+  const horizontalPadding = isMobileOrTablet ? 0 : FIT_PADDING * 2;
+  const topChrome = isMobileOrTablet ? 56 : FIT_PADDING;
+  const bottomChrome = hasThumbs ? (isMobileOrTablet ? 110 : 170) : isMobileOrTablet ? 56 : FIT_PADDING;
+  const availableWidth = Math.max(100, window.innerWidth - horizontalPadding);
+  const availableHeight = Math.max(100, window.innerHeight - topChrome - bottomChrome);
+  const fitScale = Math.min(availableWidth / intrinsic.width, availableHeight / intrinsic.height);
+  const clamped = Math.min(Math.max(fitScale, MIN_SCALE), MAX_SCALE);
+  return { base: intrinsic, fitScale: clamped };
+};
+
+/**
  * Fullscreen diagram viewer opened by clicking a rendered diagram (shared by the
  * Mermaid and WaveDrom blocks).
  *
@@ -142,8 +164,65 @@ function DiagramZoomOverlay({
 }: DiagramZoomOverlayProps) {
   const { t } = useTranslation();
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [base, setBase] = useState<DiagramSize | null>(null);
-  const [scale, setScale] = useState(1);
+
+  // Gallery mode highlights one item of the registered stream; single mode is
+  // the previous behavior with the svg handed in directly.
+  const isGallery = items != null && activeId != null;
+  const activeIndex = isGallery ? items.findIndex((item) => item.id === activeId) : -1;
+  const activeItem = isGallery && activeIndex >= 0 ? items[activeIndex] : null;
+  const overlaySvg = useMemo(() => stripInlineMaxWidth(activeItem ? activeItem.svg : (svg ?? '')), [activeItem, svg]);
+
+  // Previous and next items for the sliding carousel track
+  const prevIndex = activeIndex > 0 ? activeIndex - 1 : -1;
+  const nextIndex = isGallery && items && activeIndex < items.length - 1 ? activeIndex + 1 : -1;
+  const prevItem = isGallery && items && prevIndex >= 0 ? items[prevIndex] : null;
+  const nextItem = isGallery && items && nextIndex >= 0 ? items[nextIndex] : null;
+
+  // Adaptive layout: mobile & tablet screens get edge-to-edge album view and bigger touch targets
+  const [isSmallScreen, setIsSmallScreen] = useState(
+    () => matchMediaQuery('(max-width: 640px)') || matchMediaQuery('(max-width: 768px)')
+  );
+  const [isTouchDevice, setIsTouchDevice] = useState(() => matchMediaQuery('(pointer: coarse)'));
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const small640 = window.matchMedia?.('(max-width: 640px)');
+    const small768 = window.matchMedia?.('(max-width: 768px)');
+    const coarseQuery = window.matchMedia?.('(pointer: coarse)');
+    const update = () => {
+      setIsSmallScreen(Boolean(small640?.matches || small768?.matches));
+      setIsTouchDevice(Boolean(coarseQuery?.matches));
+    };
+    small640?.addEventListener?.('change', update);
+    small768?.addEventListener?.('change', update);
+    coarseQuery?.addEventListener?.('change', update);
+    window.addEventListener('resize', update);
+    return () => {
+      small640?.removeEventListener?.('change', update);
+      small768?.removeEventListener?.('change', update);
+      coarseQuery?.removeEventListener?.('change', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  const isMobileOrTablet = isSmallScreen || isTouchDevice;
+  const hasThumbs = isGallery && (items?.length ?? 0) > 1;
+
+  // Pre-calculate contain-fit dimensions synchronously for active, prev, and next diagrams
+  const activeFit = useMemo(
+    () => computeDiagramFit(overlaySvg, hasThumbs, isMobileOrTablet),
+    [overlaySvg, hasThumbs, isMobileOrTablet]
+  );
+  const prevFit = useMemo(
+    () => (prevItem ? computeDiagramFit(stripInlineMaxWidth(prevItem.svg), hasThumbs, isMobileOrTablet) : null),
+    [prevItem, hasThumbs, isMobileOrTablet]
+  );
+  const nextFit = useMemo(
+    () => (nextItem ? computeDiagramFit(stripInlineMaxWidth(nextItem.svg), hasThumbs, isMobileOrTablet) : null),
+    [nextItem, hasThumbs, isMobileOrTablet]
+  );
+
+  const [base, setBase] = useState<DiagramSize | null>(() => activeFit.base);
+  const [scale, setScale] = useState<number>(() => activeFit.fitScale);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const [slideOffset, setSlideOffset] = useState(0);
   const [dismissOffsetY, setDismissOffsetY] = useState(0);
@@ -176,35 +255,40 @@ function DiagramZoomOverlay({
     startMidY: number;
   } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
-  const initialScaleRef = useRef(1);
+  const initialScaleRef = useRef<number>(activeFit.fitScale);
 
-  // Adaptive layout: mobile & tablet screens get edge-to-edge album view and bigger touch targets
-  const [isSmallScreen, setIsSmallScreen] = useState(
-    () => matchMediaQuery('(max-width: 640px)') || matchMediaQuery('(max-width: 768px)')
-  );
-  const [isTouchDevice, setIsTouchDevice] = useState(() => matchMediaQuery('(pointer: coarse)'));
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const small640 = window.matchMedia?.('(max-width: 640px)');
-    const small768 = window.matchMedia?.('(max-width: 768px)');
-    const coarseQuery = window.matchMedia?.('(pointer: coarse)');
-    const update = () => {
-      setIsSmallScreen(Boolean(small640?.matches || small768?.matches));
-      setIsTouchDevice(Boolean(coarseQuery?.matches));
-    };
-    small640?.addEventListener?.('change', update);
-    small768?.addEventListener?.('change', update);
-    coarseQuery?.addEventListener?.('change', update);
-    window.addEventListener('resize', update);
-    return () => {
-      small640?.removeEventListener?.('change', update);
-      small768?.removeEventListener?.('change', update);
-      coarseQuery?.removeEventListener?.('change', update);
-      window.removeEventListener('resize', update);
-    };
-  }, []);
+  // Switching diagrams re-runs the sizing pipeline from scratch: immediately apply the
+  // pre-computed fit scale so there is no unscaled or jumpy intermediate frame.
+  const activeKey = activeItem?.id ?? 'single';
+  useLayoutEffect(() => {
+    setBase(activeFit.base);
+    setScale(activeFit.fitScale);
+    initialScaleRef.current = activeFit.fitScale;
+    setTranslate({ x: 0, y: 0 });
+    setSlideOffset(0);
+  }, [activeKey, activeFit]);
 
-  const isMobileOrTablet = isSmallScreen || isTouchDevice;
+  // Fallback DOM measurement for SVGs without intrinsic dimensions / viewBox
+  useLayoutEffect(() => {
+    if (getSvgIntrinsicSize(overlaySvg)) return;
+    const svgElement = overlayRef.current?.querySelector('svg');
+    const width = svgElement?.scrollWidth || svgElement?.clientWidth;
+    const height = svgElement?.scrollHeight || svgElement?.clientHeight;
+    if (width && height && (width !== base?.width || height !== base?.height)) {
+      const newBase = { width, height };
+      setBase(newBase);
+      const horizontalPadding = isMobileOrTablet ? 0 : FIT_PADDING * 2;
+      const topChrome = isMobileOrTablet ? 56 : FIT_PADDING;
+      const bottomChrome = hasThumbs ? (isMobileOrTablet ? 110 : 170) : isMobileOrTablet ? 56 : FIT_PADDING;
+      const fitScale = Math.min(
+        (window.innerWidth - horizontalPadding) / width,
+        (window.innerHeight - topChrome - bottomChrome) / height
+      );
+      const clamped = Math.min(Math.max(fitScale, MIN_SCALE), MAX_SCALE);
+      initialScaleRef.current = clamped;
+      setScale(clamped);
+    }
+  }, [overlaySvg, base, hasThumbs, isMobileOrTablet]);
 
   // Prevent background webpage scrolling or zooming when gallery overlay is open on touch devices
   useEffect(() => {
@@ -253,62 +337,6 @@ function DiagramZoomOverlay({
     };
   }, [onClose]);
 
-  // Gallery mode highlights one item of the registered stream; single mode is
-  // the previous behavior with the svg handed in directly.
-  const isGallery = items != null && activeId != null;
-  const activeIndex = isGallery ? items.findIndex((item) => item.id === activeId) : -1;
-  const activeItem = isGallery && activeIndex >= 0 ? items[activeIndex] : null;
-  const overlaySvg = useMemo(() => stripInlineMaxWidth(activeItem ? activeItem.svg : (svg ?? '')), [activeItem, svg]);
-
-  // Previous and next items for the sliding carousel track
-  const prevIndex = activeIndex > 0 ? activeIndex - 1 : -1;
-  const nextIndex = isGallery && items && activeIndex < items.length - 1 ? activeIndex + 1 : -1;
-  const prevItem = isGallery && items && prevIndex >= 0 ? items[prevIndex] : null;
-  const nextItem = isGallery && items && nextIndex >= 0 ? items[nextIndex] : null;
-
-  // Switching diagrams re-runs the sizing pipeline from scratch: forget the
-  // previous diagram's size, scale and pan so the next one is measured and
-  // contain-fitted again instead of inheriting the old view.
-  const activeKey = activeItem?.id ?? 'single';
-  useLayoutEffect(() => {
-    setBase(null);
-    setScale(1);
-    setTranslate({ x: 0, y: 0 });
-    setSlideOffset(0);
-  }, [activeKey]);
-
-  // Resolve the natural diagram size (viewBox first, then a DOM measurement for
-  // SVGs without one).
-  useLayoutEffect(() => {
-    if (base) return;
-    const intrinsic = getSvgIntrinsicSize(overlaySvg);
-    if (intrinsic) {
-      setBase(intrinsic);
-      return;
-    }
-    const svgElement = overlayRef.current?.querySelector('svg');
-    const width = svgElement?.scrollWidth || svgElement?.clientWidth || 800;
-    const height = svgElement?.scrollHeight || svgElement?.clientHeight || 600;
-    if (width && height) setBase({ width, height });
-  }, [overlaySvg, base]);
-
-  // Contain-fit the diagram into the viewport: on mobile/tablet, expand to full screen width
-  // like a native photo album. Gallery mode reserves room at bottom for controls/thumbs.
-  const hasThumbs = isGallery && (items?.length ?? 0) > 1;
-  useLayoutEffect(() => {
-    if (!base) return;
-    const horizontalPadding = isMobileOrTablet ? 0 : FIT_PADDING * 2;
-    const topChrome = isMobileOrTablet ? 56 : FIT_PADDING;
-    const bottomChrome = hasThumbs ? (isMobileOrTablet ? 110 : 170) : isMobileOrTablet ? 56 : FIT_PADDING;
-    const fitScale = Math.min(
-      (window.innerWidth - horizontalPadding) / base.width,
-      (window.innerHeight - topChrome - bottomChrome) / base.height
-    );
-    const clamped = Math.min(Math.max(fitScale, MIN_SCALE), MAX_SCALE);
-    initialScaleRef.current = clamped;
-    setScale(clamped);
-  }, [base, hasThumbs, isMobileOrTablet]);
-
   // Wheel zoom needs a native listener: React's root wheel listeners are
   // passive, so preventDefault via the synthetic event cannot stop page scroll.
   useEffect(() => {
@@ -331,7 +359,8 @@ function DiagramZoomOverlay({
       const target = activeIndex + direction;
       if (target >= 0 && target < items.length) {
         const targetId = items[target].id;
-        if (isTestEnv) {
+        // On desktop / non-touch navigation (or in test env), switch immediately without 100vw screen slide
+        if (isTestEnv || !isMobileOrTablet) {
           onNavigate(targetId);
           setSlideOffset(0);
           return;
@@ -346,7 +375,7 @@ function DiagramZoomOverlay({
         }, 280);
       }
     },
-    [isGallery, items, onNavigate, activeIndex, isSliding]
+    [isGallery, items, onNavigate, activeIndex, isSliding, isMobileOrTablet]
   );
 
   // Keyboard: ESC closes; gallery mode also flips diagrams with ←/→ (or A/D)
@@ -1188,7 +1217,7 @@ function DiagramZoomOverlay({
         }}
       >
         {/* Previous Slide (positioned at -100vw) */}
-        {prevItem && (
+        {prevItem && prevFit && (
           <div
             data-testid='diagram-slide-prev'
             style={{
@@ -1207,9 +1236,8 @@ function DiagramZoomOverlay({
                 background: prevItem.panelBackground ?? cardBackground ?? 'var(--bg-1)',
                 padding: isMobileOrTablet ? '0px' : '12px',
                 borderRadius: isMobileOrTablet ? '0px' : '8px',
-                width: isMobileOrTablet ? '100vw' : undefined,
-                maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
-                maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
+                width: prevFit.base.width * prevFit.fitScale,
+                height: prevFit.base.height * prevFit.fitScale,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1263,7 +1291,7 @@ function DiagramZoomOverlay({
         </div>
 
         {/* Next Slide (positioned at +100vw) */}
-        {nextItem && (
+        {nextItem && nextFit && (
           <div
             data-testid='diagram-slide-next'
             style={{
@@ -1282,9 +1310,8 @@ function DiagramZoomOverlay({
                 background: nextItem.panelBackground ?? cardBackground ?? 'var(--bg-1)',
                 padding: isMobileOrTablet ? '0px' : '12px',
                 borderRadius: isMobileOrTablet ? '0px' : '8px',
-                width: isMobileOrTablet ? '100vw' : undefined,
-                maxWidth: isMobileOrTablet ? '100vw' : MAX_BOX_WIDTH,
-                maxHeight: isMobileOrTablet ? '100vh' : MAX_BOX_HEIGHT,
+                width: nextFit.base.width * nextFit.fitScale,
+                height: nextFit.base.height * nextFit.fitScale,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
