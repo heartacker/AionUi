@@ -12,10 +12,10 @@ import { useConversationContextSafe } from '@/renderer/hooks/context/Conversatio
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useLocalFilePreview } from '@/renderer/pages/conversation/Preview/hooks/useLocalFilePreview';
 import { iconColors } from '@/renderer/styles/colors';
-import { Alert, Message, Tooltip } from '@arco-design/web-react';
-import { Copy } from '@icon-park/react';
+import { Alert, Button, Input, Message, Popover, Tooltip } from '@arco-design/web-react';
+import { Copy, EditTwo } from '@icon-park/react';
 import classNames from 'classnames';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
@@ -27,6 +27,7 @@ import { buildTurnClipboardText } from '@renderer/utils/chat/turnCopy';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
 import { isForkEnabled } from '@/common/chat/forkConversation';
 import { useForkConversation } from '@/renderer/hooks/chat/useForkConversation';
+import { requestConversationSendBoxPrefill } from '@/renderer/hooks/chat/useSendBoxDraft';
 import ForkBranchIcon from '@renderer/components/base/ForkBranchIcon';
 
 /**
@@ -207,6 +208,74 @@ const MessageText: React.FC<{
     </Tooltip>
   );
 
+  const [editPopoverVisible, setEditPopoverVisible] = useState(false);
+  const [editText, setEditText] = useState(visibleText);
+
+  // Keep editText in sync if visibleText changes
+  useEffect(() => {
+    setEditText(visibleText);
+  }, [visibleText]);
+
+  const handleEditOpenChange = (visible: boolean) => {
+    if (visible) {
+      setEditText(visibleText);
+    }
+    setEditPopoverVisible(visible);
+  };
+
+  const handleCancelEdit = () => {
+    setEditText(visibleText);
+    setEditPopoverVisible(false);
+  };
+
+  const handleConfirmEdit = () => {
+    const trimmed = editText.trim();
+    if (!trimmed || !conversationContext?.conversation_id) return;
+    setEditPopoverVisible(false);
+    requestConversationSendBoxPrefill(conversationContext.conversation_id, trimmed);
+  };
+
+  // Edit is available ONLY on the last message and ONLY if it is a user message.
+  // Placed right beside the fork button.
+  const editButton =
+    isUserMessage && isLastMessage ? (
+      <Popover
+        trigger='click'
+        position='top'
+        popupVisible={editPopoverVisible}
+        onVisibleChange={handleEditOpenChange}
+        content={
+          <div className='w-320px flex flex-col gap-8px p-4px' data-testid='message-edit-popover'>
+            <Input.TextArea
+              value={editText}
+              onChange={setEditText}
+              autoSize={{ minRows: 2, maxRows: 6 }}
+              autoFocus
+              data-testid='message-edit-textarea'
+            />
+            <div className='flex justify-end gap-8px'>
+              <Button size='mini' onClick={handleCancelEdit} data-testid='message-edit-cancel'>
+                {t('common.cancel', { defaultValue: 'Cancel' })}
+              </Button>
+              <Button size='mini' type='primary' onClick={handleConfirmEdit} data-testid='message-edit-confirm'>
+                {t('common.send', { defaultValue: 'Send' })}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <Tooltip content={t('messages.edit.action', { defaultValue: 'Edit message' })}>
+          <div
+            className='p-4px rd-4px cursor-pointer hover:bg-3 transition-colors opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+            style={{ lineHeight: 0 }}
+            data-testid='message-edit-button'
+          >
+            <EditTwo size={16} fill={iconColors.secondary} />
+          </div>
+        </Tooltip>
+      </Popover>
+    ) : null;
+
   // Fork entry point: only when the agent declares the capability, and only on
   // messages the backend can actually fork at (any message for at_turn/codex,
   // the last message otherwise) — see `isForkEnabled`.
@@ -361,6 +430,7 @@ const MessageText: React.FC<{
             })}
           >
             {copyButton}
+            {editButton}
             {forkButton}
             {message.created_at && (
               <span className='text-12px text-t-secondary opacity-0 group-hover:opacity-100 transition-opacity select-none'>
