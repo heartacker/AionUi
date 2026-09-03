@@ -12,6 +12,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs, vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import MermaidBlock from './diagrams/MermaidBlock';
+import BeautifulMermaidBlock from './diagrams/BeautifulMermaidBlock';
 import WavedromBlock from './diagrams/WavedromBlock';
 import EchartsBlock from './diagrams/EchartsBlock';
 import MathBlock from './diagrams/MathBlock';
@@ -74,7 +75,7 @@ function CodeBlock(props: CodeBlockProps) {
     diagramPanZoom: _dpz,
     ...rest
   } = props;
-  const match = /language-(\w+)/.exec(className || '');
+  const match = /language-([\w-]+)/.exec(className || '');
   const language = match?.[1] || 'text';
 
   // KaTeX math blocks — unified with the diagram pipeline everywhere (chat and
@@ -91,6 +92,17 @@ function CodeBlock(props: CodeBlockProps) {
 
   if (language === 'mermaid') {
     return <MermaidBlock code={formatCode(children)} style={props.codeStyle} enablePanZoom={props.diagramPanZoom} />;
+  }
+
+  if (
+    language === 'beautiful-mermaid' ||
+    language === 'beautifulmermaid' ||
+    language === 'beatiful-mermaid' ||
+    language === 'beatifulmermaid'
+  ) {
+    return (
+      <BeautifulMermaidBlock code={formatCode(children)} style={props.codeStyle} enablePanZoom={props.diagramPanZoom} />
+    );
   }
 
   if (language === 'wavedrom' || language === 'wavejson') {

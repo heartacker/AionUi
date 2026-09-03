@@ -214,5 +214,7 @@
   "drawio.viewMode": "보기",
   "drawio.switchToView": "보기 모드로 전환",
   "drawio.switchToEdit": "비주얼 편집 모드로 전환",
-  "drawio.saveSuccess": "Draw.io 다이어그램이 저장되었습니다"
+  "drawio.saveSuccess": "Draw.io 다이어그램이 저장되었습니다",
+  "beautifulMermaidTitle": "Beautiful Mermaid 다이어그램",
+  "ascii": "ASCII"
 }

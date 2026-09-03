@@ -247,13 +247,16 @@ export type DiagramSize = { width: number; height: number };
  * "%%{init:{...}" which is noise as a title). WaveDrom is JSON5: skip comments
  * and punctuation-only lines like the opening `{`.
  */
-export const getDiagramSummary = (code: string, kind: 'mermaid' | 'wavedrom'): string | undefined =>
+export const getDiagramSummary = (
+  code: string,
+  kind: 'mermaid' | 'beautiful-mermaid' | 'wavedrom'
+): string | undefined =>
   code
     .split(/\r?\n/)
     .map((line) => line.trim())
     .find((line) => {
       if (!line) return false;
-      if (kind === 'mermaid') return !line.startsWith('%%');
+      if (kind === 'mermaid' || kind === 'beautiful-mermaid') return !line.startsWith('%%');
       return !/^[{}[\],]*$/.test(line) && !line.startsWith('//');
     });
 

@@ -54,8 +54,18 @@ const SEP = '\0';
 export const reflessTabKey = (type: PreviewContentType, content?: string, meta?: PreviewMetadata): string | null => {
   // Diagram blocks (mermaid, echarts) are keyed on their code content. Keying on the rendered title
   // instead is what let two different diagrams sharing a first line overwrite each other.
-  if (type === 'markdown' && (content?.startsWith('```mermaid') || content?.startsWith('```echarts'))) {
-    const kind = content.startsWith('```echarts') ? 'echarts' : 'mermaid';
+  if (
+    type === 'markdown' &&
+    (content?.startsWith('```mermaid') ||
+      content?.startsWith('```beautiful-mermaid') ||
+      content?.startsWith('```beatiful-mermaid') ||
+      content?.startsWith('```echarts'))
+  ) {
+    const kind = content.startsWith('```echarts')
+      ? 'echarts'
+      : content.startsWith('```beautiful-mermaid') || content.startsWith('```beatiful-mermaid')
+        ? 'beautiful-mermaid'
+        : 'mermaid';
     return `${kind}${SEP}${hashText(content)}`;
   }
 

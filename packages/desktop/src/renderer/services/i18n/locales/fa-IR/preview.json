@@ -214,5 +214,7 @@
   "drawio.viewMode": "مشاهده",
   "drawio.switchToView": "تغییر به حالت مشاهده",
   "drawio.switchToEdit": "تغییر به حالت ویرایش بصری",
-  "drawio.saveSuccess": "نمودار Draw.io ذخیره شد"
+  "drawio.saveSuccess": "نمودار Draw.io ذخیره شد",
+  "beautifulMermaidTitle": "نمودار Beautiful Mermaid",
+  "ascii": "ASCII"
 }

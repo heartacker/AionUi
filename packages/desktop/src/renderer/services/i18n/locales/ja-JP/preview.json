@@ -214,5 +214,7 @@
   "drawio.viewMode": "プレビュー",
   "drawio.switchToView": "プレビューモードに切り替え",
   "drawio.switchToEdit": "ビジュアル編集モードに切り替え",
-  "drawio.saveSuccess": "Draw.io ダイアグラムを保存しました"
+  "drawio.saveSuccess": "Draw.io ダイアグラムを保存しました",
+  "beautifulMermaidTitle": "Beautiful Mermaid ダイアグラム",
+  "ascii": "テキスト"
 }
