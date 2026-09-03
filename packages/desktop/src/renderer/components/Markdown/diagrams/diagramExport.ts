@@ -50,7 +50,91 @@ export const sanitizeAndFormatSvg = (rawSvg: string): string => {
   const stripped = stripSvgCodeFence(rawSvg);
   const namespaced = ensureSvgNamespaces(stripped);
   const withViewBox = ensureSvgViewBox(namespaced);
-  return cleanSvgForXml(withViewBox);
+  return inlineBeautifulMermaidCss(cleanSvgForXml(withViewBox));
+};
+
+/**
+ * Inlines CSS custom properties in beautiful-mermaid SVGs.
+ * Browsers loading standalone SVG images (e.g. `new Image().src = blobUrl`) or rendering
+ * directly into Canvas ignore CSS variable declarations in `<svg style="...">` or `<style>` blocks,
+ * causing all fill/stroke colors relying on `var(--_line)`, `var(--_text)`, etc. to fall back to black (#000).
+ */
+export const inlineBeautifulMermaidCss = (svg: string): string => {
+  if (!svg || !svg.includes('--bg:') || !svg.includes('--fg:')) return svg;
+
+  const styleMatch = /\bstyle\s*=\s*["']([^"']*)["']/i.exec(svg);
+  const styleAttr = styleMatch ? styleMatch[1] : '';
+  const bgMatch = /--bg:\s*([^;"]+)/.exec(styleAttr);
+  const fgMatch = /--fg:\s*([^;"]+)/.exec(styleAttr);
+  if (!bgMatch || !fgMatch) return svg;
+
+  const bg = bgMatch[1].trim();
+  const fg = fgMatch[1].trim();
+
+  const hexToRgb = (hex: string): [number, number, number] => {
+    const cleanHex = hex.replace('#', '');
+    const fullHex =
+      cleanHex.length === 3
+        ? cleanHex
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : cleanHex;
+    const num = parseInt(fullHex, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  };
+
+  const rgbToHex = (r: number, g: number, b: number): string =>
+    '#' +
+    [r, g, b]
+      .map((x) =>
+        Math.round(Math.min(255, Math.max(0, x)))
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('');
+
+  const mix = (fgPercent: number): string => {
+    try {
+      const fgRgb = hexToRgb(fg);
+      const bgRgb = hexToRgb(bg);
+      const p = fgPercent / 100;
+      const r = fgRgb[0] * p + bgRgb[0] * (1 - p);
+      const g = fgRgb[1] * p + bgRgb[1] * (1 - p);
+      const b = fgRgb[2] * p + bgRgb[2] * (1 - p);
+      return rgbToHex(r, g, b);
+    } catch {
+      return fg;
+    }
+  };
+
+  const varReplacements: Record<string, string> = {
+    'var(--_text)': fg,
+    'var(--_text-sec)': mix(60),
+    'var(--_text-muted)': mix(40),
+    'var(--_text-faint)': mix(25),
+    'var(--_line)': mix(50),
+    'var(--_arrow)': mix(85),
+    'var(--_node-fill)': mix(3),
+    'var(--_node-stroke)': mix(20),
+    'var(--_group-fill)': bg,
+    'var(--_group-hdr)': mix(5),
+    'var(--_inner-stroke)': mix(12),
+    'var(--_key-badge)': mix(10),
+    'var(--fg)': fg,
+    'var(--bg)': bg,
+    'var(--accent, #3b82f6)': '#3b82f6',
+    'var(--xychart-color-0)': '#3b82f6',
+    'var(--xychart-bar-fill-0)': mix(25),
+    'var(--xychart-color-1)': '#5f79f2',
+    'var(--xychart-bar-fill-1)': mix(25),
+  };
+
+  let resolvedSvg = svg;
+  for (const [varName, concreteColor] of Object.entries(varReplacements)) {
+    resolvedSvg = resolvedSvg.replaceAll(varName, concreteColor);
+  }
+  return resolvedSvg;
 };
 
 /**
@@ -132,11 +216,14 @@ const toFixedSizeSvg = (svg: string, scale: number): string => {
   const width = Math.max(1, Math.round(intrinsic.width * scale));
   const height = Math.max(1, Math.round(intrinsic.height * scale));
   return svg.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => {
+    const styleMatch = /\sstyle\s*=\s*["']([^"']*)["']/i.exec(attrs);
+    const existingStyle = styleMatch ? styleMatch[1] : '';
     const cleaned = attrs
       .replace(/\swidth\s*=\s*["'][^"']*["']/gi, '')
       .replace(/\sheight\s*=\s*["'][^"']*["']/gi, '')
       .replace(/\sstyle\s*=\s*["'][^"']*["']/gi, '');
-    return `<svg${cleaned} width="${width}" height="${height}">`;
+    const styleAttr = existingStyle ? ` style="${existingStyle}"` : '';
+    return `<svg${cleaned} width="${width}" height="${height}"${styleAttr}>`;
   });
 };
 
