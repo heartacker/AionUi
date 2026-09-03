@@ -16,7 +16,7 @@ export type DiagramItem = {
   /** Raw source code of the block, for the copy-source toolbar action. */
   code?: string;
   /** Diagram kind; drives the gallery header label. 'chart' is reserved for future canvas-based types. */
-  type: 'mermaid' | 'wavedrom' | 'math' | 'chart' | 'svg' | 'image';
+  type: 'mermaid' | 'beautiful-mermaid' | 'wavedrom' | 'math' | 'chart' | 'svg' | 'image';
   /** Optional display title (first non-empty source line, truncated). */
   title?: string;
   /** Card backdrop for diagrams whose strokes depend on it (WaveDrom dark skin). */

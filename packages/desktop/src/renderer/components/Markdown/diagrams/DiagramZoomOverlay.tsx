@@ -700,15 +700,17 @@ function DiagramZoomOverlay({
   const typeLabel = activeItem
     ? activeItem.type === 'wavedrom'
       ? t('preview.wavedromTitle')
-      : activeItem.type === 'math'
-        ? t('preview.mathTitle')
-        : activeItem.type === 'chart'
-          ? t('preview.echartsTitle')
-          : activeItem.type === 'svg'
-            ? t('preview.svgTitle')
-            : activeItem.type === 'image'
-              ? t('preview.imageTitle')
-              : t('preview.mermaidTitle')
+      : activeItem.type === 'beautiful-mermaid'
+        ? t('preview.beautifulMermaidTitle')
+        : activeItem.type === 'math'
+          ? t('preview.mathTitle')
+          : activeItem.type === 'chart'
+            ? t('preview.echartsTitle')
+            : activeItem.type === 'svg'
+              ? t('preview.svgTitle')
+              : activeItem.type === 'image'
+                ? t('preview.imageTitle')
+                : t('preview.mermaidTitle')
     : (ariaLabel ?? '');
   const subtitle = activeItem?.title;
   const dialogAriaLabel =

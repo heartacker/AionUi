@@ -216,5 +216,7 @@
   "drawio.viewMode": "Перегляд",
   "drawio.switchToView": "Перемкнути в режим перегляду",
   "drawio.switchToEdit": "Перемкнути у візуальний редактор",
-  "drawio.saveSuccess": "Діаграму Draw.io збережено"
+  "drawio.saveSuccess": "Діаграму Draw.io збережено",
+  "beautifulMermaidTitle": "Діаграма Beautiful Mermaid",
+  "ascii": "ASCII"
 }

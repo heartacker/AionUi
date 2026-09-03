@@ -214,5 +214,7 @@
   "drawio.viewMode": "只读预览",
   "drawio.switchToView": "切换为只读预览模式",
   "drawio.switchToEdit": "切换为可视化编辑模式",
-  "drawio.saveSuccess": "Draw.io 图表已保存"
+  "drawio.saveSuccess": "Draw.io 图表已保存",
+  "beautifulMermaidTitle": "Beautiful Mermaid 图表",
+  "ascii": "字符"
 }

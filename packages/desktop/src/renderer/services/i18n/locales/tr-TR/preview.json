@@ -214,5 +214,7 @@
   "drawio.viewMode": "Görüntüle",
   "drawio.switchToView": "Görüntüleme Moduna Geç",
   "drawio.switchToEdit": "Görsel Düzenleme Moduna Geç",
-  "drawio.saveSuccess": "Draw.io şeması kaydedildi"
+  "drawio.saveSuccess": "Draw.io şeması kaydedildi",
+  "beautifulMermaidTitle": "Beautiful Mermaid Diyagramı",
+  "ascii": "ASCII"
 }

@@ -214,5 +214,7 @@
   "drawio.viewMode": "Ver",
   "drawio.switchToView": "Cambiar al modo de vista",
   "drawio.switchToEdit": "Cambiar al modo de edición visual",
-  "drawio.saveSuccess": "Diagrama Draw.io guardado"
+  "drawio.saveSuccess": "Diagrama Draw.io guardado",
+  "beautifulMermaidTitle": "Diagrama Beautiful Mermaid",
+  "ascii": "ASCII"
 }

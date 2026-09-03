@@ -88,10 +88,20 @@ fs.cpSync(backendSrc, backendDest, { recursive: true });
 
 // 8. Create tarball
 fs.mkdirSync(distDir, { recursive: true });
-execSync(`tar -czf ${path.basename(tarballPath)} -C ${stagingDir} aionui-web`, {
-  cwd: path.dirname(tarballPath),
-  stdio: 'inherit',
-});
+const tarFlags = process.platform === 'linux' ? '--warning=no-file-changed -czf' : '-czf';
+try {
+  execSync(`tar ${tarFlags} ${path.basename(tarballPath)} -C ${stagingDir} aionui-web`, {
+    cwd: path.dirname(tarballPath),
+    stdio: 'inherit',
+  });
+} catch (err) {
+  // GNU tar returns status 1 if files changed during read (non-fatal warning)
+  if (err && err.status === 1 && fs.existsSync(tarballPath) && fs.statSync(tarballPath).size > 0) {
+    console.warn('⚠️ tar exited with status 1 (file changed during read); archive created successfully.');
+  } else {
+    throw err;
+  }
+}
 
 console.log(`✅ Tarball created: ${tarballPath}`);
 

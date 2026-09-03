@@ -583,6 +583,20 @@ export const prepareDiagramSvgForExport = async (
 
   const targetTheme: 'light' | 'dark' = format === 'png-dark' ? 'dark' : 'light';
 
+  if (item.type === 'beautiful-mermaid') {
+    try {
+      const { renderMermaidSVG } = await import('beautiful-mermaid');
+      const isDark = targetTheme === 'dark';
+      const bg = format === 'png-transparent' ? (isDark ? '#1d2129' : '#ffffff') : isDark ? '#1d2129' : '#ffffff';
+      const fg = isDark ? '#f6f8fa' : '#1d2129';
+      const transparent = format === 'png-transparent';
+      return renderMermaidSVG(item.code, { bg, fg, transparent });
+    } catch (e) {
+      console.warn('[prepareDiagramSvgForExport] beautiful-mermaid re-render failed:', e);
+      return svg;
+    }
+  }
+
   if (item.type === 'mermaid') {
     try {
       const mermaid = (await import('mermaid')).default;
