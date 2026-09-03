@@ -1214,6 +1214,7 @@ export type I18nKey =
   | 'messages.delivery.pending'
   | 'messages.downloadFailed'
   | 'messages.downloadSuccess'
+  | 'messages.edit.action'
   | 'messages.export.assistantLabel'
   | 'messages.export.commandDescription'
   | 'messages.export.conversationIdLabel'

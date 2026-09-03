@@ -131,5 +131,8 @@
     "saveSuccess": "Saved to: {{path}}",
     "saveFailed": "Failed to save file",
     "noContentWarning": "No exportable messages found"
+  },
+  "edit": {
+    "action": "Редагувати повідомлення"
   }
 }

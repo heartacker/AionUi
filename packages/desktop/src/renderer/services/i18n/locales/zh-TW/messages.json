@@ -125,5 +125,8 @@
     "saveSuccess": "文件已保存：{{path}}",
     "saveFailed": "文件保存失败",
     "noContentWarning": "当前没有可导出的消息"
+  },
+  "edit": {
+    "action": "編輯訊息"
   }
 }

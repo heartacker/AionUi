@@ -40,6 +40,14 @@ const forkMocks = vi.hoisted(() => ({
   navigate: vi.fn(),
 }));
 
+const prefillMocks = vi.hoisted(() => ({
+  requestConversationSendBoxPrefill: vi.fn(),
+}));
+
+vi.mock('@/renderer/hooks/chat/useSendBoxDraft', () => ({
+  requestConversationSendBoxPrefill: (...args: unknown[]) => prefillMocks.requestConversationSendBoxPrefill(...args),
+}));
+
 vi.mock('@/common', () => ({
   ipcBridge: {
     fs: {
@@ -141,14 +149,55 @@ vi.mock('@/renderer/utils/ui/clipboard', () => ({
 
 vi.mock('@arco-design/web-react', () => ({
   Alert: () => null,
+  Button: ({
+    children,
+    onClick,
+    'data-testid': testId,
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    'data-testid'?: string;
+  }) => (
+    <button onClick={onClick} data-testid={testId}>
+      {children}
+    </button>
+  ),
+  Input: {
+    TextArea: ({
+      value,
+      onChange,
+      'data-testid': testId,
+    }: {
+      value?: string;
+      onChange?: (val: string) => void;
+      'data-testid'?: string;
+    }) => <textarea value={value} onChange={(e) => onChange?.(e.target.value)} data-testid={testId} />,
+  },
   Message: {
     error: vi.fn(),
   },
+  Popover: ({
+    children,
+    content,
+    popupVisible,
+    onVisibleChange,
+  }: {
+    children?: React.ReactNode;
+    content?: React.ReactNode;
+    popupVisible?: boolean;
+    onVisibleChange?: (visible: boolean) => void;
+  }) => (
+    <div>
+      <div onClick={() => onVisibleChange?.(!popupVisible)}>{children}</div>
+      {popupVisible && content}
+    </div>
+  ),
   Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('@icon-park/react', () => ({
   Copy: () => <span data-testid='copy-icon' />,
+  EditTwo: () => <span data-testid='edit-icon' />,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -817,5 +866,102 @@ describe('MessageText fork entry point', () => {
       expect(forkMocks.navigate).toHaveBeenCalledWith('/conversation/conv-forked');
       expect(forkMocks.ensureRuntime).toHaveBeenCalledWith({ conversation_id: 'conv-forked' });
     });
+  });
+
+  it('shows edit button only on the last message if it is a user message, opening popover to edit', () => {
+    const userMessage: IMessageText = {
+      id: 'msg-edit-1',
+      type: 'text',
+      position: 'right',
+      content: { content: 'Please modify this prompt' },
+      created_at: 1000,
+    };
+    // When not last message, edit button should not be displayed
+    const { rerender } = render(
+      <ConversationProvider
+        value={{
+          conversation_id: 'conv-edit',
+        }}
+      >
+        <MessageText message={userMessage} isLastMessage={false} />
+      </ConversationProvider>
+    );
+    expect(screen.queryByTestId('message-edit-button')).toBeNull();
+
+    // When last message, edit button is displayed
+    rerender(
+      <ConversationProvider
+        value={{
+          conversation_id: 'conv-edit',
+        }}
+      >
+        <MessageText message={userMessage} isLastMessage={true} />
+      </ConversationProvider>
+    );
+
+    const editBtn = screen.getByTestId('message-edit-button');
+    expect(editBtn).toBeInTheDocument();
+    fireEvent.click(editBtn);
+
+    // Popover content should be visible
+    const textarea = screen.getByTestId('message-edit-textarea');
+    expect(textarea).toBeInTheDocument();
+    expect(textarea).toHaveValue('Please modify this prompt');
+
+    // Change text and confirm
+    fireEvent.change(textarea, { target: { value: 'Modified prompt' } });
+    fireEvent.click(screen.getByTestId('message-edit-confirm'));
+
+    expect(prefillMocks.requestConversationSendBoxPrefill).toHaveBeenCalledWith('conv-edit', 'Modified prompt');
+  });
+
+  it('allows canceling edit without side-effects', () => {
+    const userMessage: IMessageText = {
+      id: 'msg-edit-2',
+      type: 'text',
+      position: 'right',
+      content: { content: 'Cancel me' },
+      created_at: 1000,
+    };
+
+    render(
+      <ConversationProvider
+        value={{
+          conversation_id: 'conv-edit',
+        }}
+      >
+        <MessageText message={userMessage} isLastMessage={true} />
+      </ConversationProvider>
+    );
+
+    const editBtn = screen.getByTestId('message-edit-button');
+    fireEvent.click(editBtn);
+    const textarea = screen.getByTestId('message-edit-textarea');
+    fireEvent.change(textarea, { target: { value: 'Different text' } });
+    fireEvent.click(screen.getByTestId('message-edit-cancel'));
+
+    expect(prefillMocks.requestConversationSendBoxPrefill).not.toHaveBeenCalledWith('conv-edit', 'Different text');
+  });
+
+  it('does not show edit button on assistant messages', () => {
+    const assistantMessage: IMessageText = {
+      id: 'msg-assistant-1',
+      type: 'text',
+      position: 'left',
+      content: { content: 'Assistant response' },
+      created_at: 1000,
+    };
+
+    render(
+      <ConversationProvider
+        value={{
+          conversation_id: 'conv-edit',
+        }}
+      >
+        <MessageText message={assistantMessage} />
+      </ConversationProvider>
+    );
+
+    expect(screen.queryByTestId('message-edit-button')).toBeNull();
   });
 });

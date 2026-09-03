@@ -125,5 +125,8 @@
   "requestDetails": "请求内容：",
   "delivery": {
     "pending": "未读"
+  },
+  "edit": {
+    "action": "编辑消息"
   }
 }

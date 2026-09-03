@@ -125,5 +125,8 @@
   "requestDetails": "Request details:",
   "delivery": {
     "pending": "Unread"
+  },
+  "edit": {
+    "action": "Edit message"
   }
 }
