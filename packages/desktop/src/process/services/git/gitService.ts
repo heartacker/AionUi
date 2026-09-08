@@ -8,6 +8,8 @@ import { execGit } from './gitExecutor';
 import type { ParsedCommit } from './gitGraphParser';
 import { calculateLanes, parseRawGitLogLine } from './gitGraphParser';
 
+export type GitStatusCode = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | 'T' | '?';
+
 export interface GitStatusSummary {
   currentBranch: string;
   trackingBranch?: string;
@@ -15,10 +17,15 @@ export interface GitStatusSummary {
   behind: number;
   modifiedFiles: Array<{
     path: string;
-    status: 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?';
+    status: GitStatusCode;
     staged: boolean;
   }>;
 }
+
+// Porcelain v1 single-letter codes (incl. 'T' typechange); anything unexpected
+// collapses to '?' so the typed union never lies about runtime data.
+const SCM_STATUS_CODES = new Set<string>(['M', 'A', 'D', 'R', 'C', 'U', 'T']);
+const scmStatusCode = (code: string): GitStatusCode => (SCM_STATUS_CODES.has(code) ? (code as GitStatusCode) : '?');
 
 export interface GitFileDiff {
   path: string;
@@ -77,14 +84,14 @@ export class GitService {
       if (indexStatus !== ' ' && indexStatus !== '?') {
         modifiedFiles.push({
           path: filePath,
-          status: indexStatus as any,
+          status: scmStatusCode(indexStatus),
           staged: true,
         });
       }
       if (workTreeStatus !== ' ') {
         modifiedFiles.push({
           path: filePath,
-          status: (workTreeStatus === '?' ? '?' : workTreeStatus) as any,
+          status: scmStatusCode(workTreeStatus === '?' ? '?' : workTreeStatus),
           staged: false,
         });
       }
@@ -105,25 +112,25 @@ export class GitService {
   public static async getCommitDiff(repoPath: string, hash: string): Promise<GitFileDiff[]> {
     const { stdout: nameStatusOut } = await execGit(['show', '--name-status', '--oneline', hash], { cwd: repoPath });
     const lines = nameStatusOut.split('\n').slice(1).filter(Boolean);
-    const result: GitFileDiff[] = [];
+    if (lines.length === 0) return [];
 
-    for (const line of lines) {
+    // Per-file diffs are independent, so they run in parallel — a wide commit
+    // used to pay N sequential git process startups. Promise.all preserves the
+    // name-status order in the result.
+    const entries = lines.map((line) => {
       const parts = line.split('\t');
       const status = parts[0];
-      const path = parts[1];
       const oldPath = parts.length > 2 ? parts[1] : undefined;
-      const finalPath = parts.length > 2 ? parts[2] : path;
+      const finalPath = parts.length > 2 ? parts[2] : parts[1];
+      return { status, path: finalPath, oldPath };
+    });
 
-      const { stdout: diffContent } = await execGit(['show', `${hash}`, '--', finalPath], { cwd: repoPath });
-      result.push({
-        path: finalPath,
-        oldPath,
-        status,
-        diff: diffContent,
-      });
-    }
-
-    return result;
+    return Promise.all(
+      entries.map(async ({ status, path: finalPath, oldPath }) => {
+        const { stdout: diffContent } = await execGit(['show', `${hash}`, '--', finalPath], { cwd: repoPath });
+        return { path: finalPath, oldPath, status, diff: diffContent };
+      })
+    );
   }
 
   /**

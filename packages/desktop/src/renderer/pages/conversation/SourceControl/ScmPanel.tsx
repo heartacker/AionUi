@@ -109,14 +109,16 @@ export const ScmPanel: React.FC<ScmPanelProps> = ({ projectId }) => {
   const handleOpenGitGraph = React.useCallback(
     (repo: ScmRepository) => {
       if (!openPreview) return;
-      let repoPath = '.';
       const peEntry = projectDetail?.explorer?.entries?.find((e) => e.pe_id === repo.root.pe_id);
-      if (peEntry?.display_path) {
-        const rel = repo.root.relative_path || '';
-        repoPath = rel
-          ? `${peEntry.display_path.replace(/[\\/]+$/, '')}/${rel.replace(/^[\\/]+/, '')}`
-          : peEntry.display_path;
+      if (!peEntry?.display_path) {
+        // No host path for this repo root — do not fall back to '.' (a relative
+        // path would run git against the renderer's cwd and fail misleadingly).
+        return;
       }
+      const rel = repo.root.relative_path || '';
+      const repoPath = rel
+        ? `${peEntry.display_path.replace(/[\\/]+$/, '')}/${rel.replace(/^[\\/]+/, '')}`
+        : peEntry.display_path;
       const repoName = repo.pe_name || repo.label;
       openPreview(repoPath, 'git-graph', {
         file_name: `Git: ${repoName}`,

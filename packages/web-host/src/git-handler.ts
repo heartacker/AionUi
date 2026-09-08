@@ -272,26 +272,26 @@ export async function handleGitGetStatus(repoPath: string): Promise<GitStatusSum
 }
 
 export async function handleGitGetCommitDiff(repoPath: string, hash: string): Promise<GitFileDiff[]> {
-  // 与主进程 GitService.getCommitDiff 相同的命令序列;hash 已由路由层做 hex 校验
+  // 与主进程 GitService.getCommitDiff 相同的命令序列与并行化策略;hash 已由路由层做 hex 校验
   const { stdout: nameStatusOut } = await execGit(['show', '--name-status', '--oneline', hash], repoPath);
   const lines = nameStatusOut.split('\n').slice(1).filter(Boolean);
-  const result: GitFileDiff[] = [];
+  if (lines.length === 0) return [];
 
-  for (const line of lines) {
+  // Per-file diffs are independent, so they run in parallel — a wide commit
+  // used to pay N sequential git process startups. Promise.all preserves the
+  // name-status order in the result.
+  const entries = lines.map((line) => {
     const parts = line.split('\t');
     const status = parts[0];
-    const path = parts[1];
     const oldPath = parts.length > 2 ? parts[1] : undefined;
-    const finalPath = parts.length > 2 ? parts[2] : path;
+    const finalPath = parts.length > 2 ? parts[2] : parts[1];
+    return { status, path: finalPath, oldPath };
+  });
 
-    const { stdout: diffContent } = await execGit(['show', `${hash}`, '--', finalPath], repoPath);
-    result.push({
-      path: finalPath,
-      oldPath,
-      status,
-      diff: diffContent,
-    });
-  }
-
-  return result;
+  return Promise.all(
+    entries.map(async ({ status, path: finalPath, oldPath }) => {
+      const { stdout: diffContent } = await execGit(['show', `${hash}`, '--', finalPath], repoPath);
+      return { path: finalPath, oldPath, status, diff: diffContent };
+    })
+  );
 }
