@@ -38,7 +38,17 @@ export type DiagramGalleryContextValue = {
   activeId: string | null;
 };
 
-const DiagramGalleryContext = React.createContext<DiagramGalleryContextValue | null>(null);
+export type DiagramGalleryDispatchValue = {
+  /** Registers or replaces a diagram without changing its position. */
+  registerDiagram: (item: DiagramItem) => void;
+  /** Removes a diagram from the gallery (block unmount / no longer renderable). */
+  unregisterDiagram: (id: string) => void;
+  /** Opens the gallery overlay positioned on the given diagram. */
+  openGallery: (id: string) => void;
+};
+
+export const DiagramGalleryContext = React.createContext<DiagramGalleryContextValue | null>(null);
+export const DiagramGalleryDispatchContext = React.createContext<DiagramGalleryDispatchValue | null>(null);
 
 /** Build a fresh context value around a state pair; extracted for reuse in tests. */
 export const createDiagramGalleryValue = (
@@ -168,6 +178,11 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
     setActiveId(null);
   }, []);
 
+  const dispatchValue = useMemo(
+    () => ({ registerDiagram, unregisterDiagram, openGallery }),
+    [registerDiagram, unregisterDiagram, openGallery]
+  );
+
   const value = useMemo(
     () => createDiagramGalleryValue(items, activeId, { registerDiagram, unregisterDiagram, openGallery }),
     [items, activeId, registerDiagram, unregisterDiagram, openGallery]
@@ -176,12 +191,14 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
   const activeItem = activeId ? (items.find((item) => item.id === activeId) ?? null) : null;
 
   return (
-    <DiagramGalleryContext.Provider value={value}>
-      {children}
-      {activeItem && (
-        <DiagramZoomOverlay items={items} activeId={activeItem.id} onNavigate={openGallery} onClose={closeGallery} />
-      )}
-    </DiagramGalleryContext.Provider>
+    <DiagramGalleryDispatchContext.Provider value={dispatchValue}>
+      <DiagramGalleryContext.Provider value={value}>
+        {children}
+        {activeItem && (
+          <DiagramZoomOverlay items={items} activeId={activeItem.id} onNavigate={openGallery} onClose={closeGallery} />
+        )}
+      </DiagramGalleryContext.Provider>
+    </DiagramGalleryDispatchContext.Provider>
   );
 }
 
@@ -195,7 +212,10 @@ export function DiagramGalleryProvider({ children }: { children: React.ReactNode
  * working without wiring the provider everywhere.
  */
 export function useDiagramGallery(item: DiagramItem | null) {
-  const context = useContext(DiagramGalleryContext);
+  const dispatchContext = useContext(DiagramGalleryDispatchContext);
+  const fullContext = useContext(DiagramGalleryContext);
+  const context = dispatchContext ?? fullContext;
+
   const [localOpenId, setLocalOpenId] = useState<string | null>(null);
   // Fallback-mode item for blocks that have nothing to register upfront and
   // hand in the item at open time (lazy snapshots, e.g. ECharts canvas).
@@ -252,5 +272,5 @@ export function useDiagramGallery(item: DiagramItem | null) {
       /** Direct setter for the local fallback overlay. */
       setLocalOpenId,
     };
-  }, [context, item, localOpenId, localItem]);
+  }, [context, item?.id, localOpenId, localItem]);
 }

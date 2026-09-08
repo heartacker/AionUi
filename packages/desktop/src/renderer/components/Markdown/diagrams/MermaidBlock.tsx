@@ -200,7 +200,6 @@ function MermaidBlock({ code, style, showOpenInPanelButton = true, enablePanZoom
       };
     }
 
-    setSvg(null);
     setIsRendering(true);
 
     const renderDiagram = async () => {

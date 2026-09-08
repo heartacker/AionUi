@@ -44,7 +44,6 @@ import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
 
 import { ipcBridge } from '@/common';
-import type { ProjectDetailDto } from '@/common/types/project';
 
 import { useOptionalPreviewContext } from '../Preview';
 import { discardAllTargets, ScmChangesView, stageAllTargets } from './ScmChangesView';

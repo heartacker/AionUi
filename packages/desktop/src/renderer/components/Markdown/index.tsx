@@ -16,7 +16,7 @@ import { openExternalUrl } from '@/renderer/utils/platform';
 import { parseHttpUrl } from '@/renderer/utils/url';
 import { useOptionalPreviewContext } from '@/renderer/pages/conversation/Preview/context/PreviewContext';
 import classNames from 'classnames';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertLatexDelimiters } from '@renderer/utils/chat/latexDelimiters';
 import { convertDisplayMathToFences } from '@renderer/utils/chat/convertDisplayMathToFences';
@@ -87,6 +87,22 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
       [t, preview]
     );
 
+    // Store dynamic props in a ref so components object can maintain permanent
+    // reference equality across parent re-renders. This prevents ReactMarkdown from
+    // unmounting/remounting custom components (e.g. CodeBlock, MermaidBlock).
+    const propsRef = useRef({
+      codeStyle,
+      hiddenCodeCopyButton,
+      handleLinkClick,
+      onLocalFileLink,
+    });
+    propsRef.current = {
+      codeStyle,
+      hiddenCodeCopyButton,
+      handleLinkClick,
+      onLocalFileLink,
+    };
+
     // Memoize components so React preserves component identity across re-renders.
     // Without this, every streaming update creates new function references → React
     // unmounts/remounts all custom components → hooks & DOM state are lost.
@@ -100,8 +116,8 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
         code: (props: Record<string, unknown>) => (
           <CodeBlock
             {...(props as Parameters<typeof CodeBlock>[0])}
-            codeStyle={codeStyle}
-            hiddenCodeCopyButton={hiddenCodeCopyButton}
+            codeStyle={propsRef.current.codeStyle}
+            hiddenCodeCopyButton={propsRef.current.hiddenCodeCopyButton}
             diagramPanZoom
           />
         ),
@@ -111,13 +127,19 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
           const localFileReference = resolveLocalFileLinkReference(rawHref);
           if (localFileReference) {
             return (
-              <LocalFileLink reference={localFileReference} onOpen={onLocalFileLink}>
+              <LocalFileLink reference={localFileReference} onOpen={propsRef.current.onLocalFileLink}>
                 {anchorProps.children}
               </LocalFileLink>
             );
           }
           return (
-            <a {...anchorProps} href={anchorProps.href} target='_blank' rel='noreferrer' onClick={handleLinkClick} />
+            <a
+              {...anchorProps}
+              href={anchorProps.href}
+              target='_blank'
+              rel='noreferrer'
+              onClick={(e) => propsRef.current.handleLinkClick(e)}
+            />
           );
         },
         table: MarkdownTable,
@@ -135,7 +157,7 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
           return <SvgBlock {...(rest as React.SVGProps<SVGSVGElement>)} className={cn as string} />;
         },
       }),
-      [codeStyle, hiddenCodeCopyButton, handleLinkClick, onLocalFileLink]
+      []
     );
 
     const rehypePlugins = useMemo(() => (allowHtml ? [rehypeRaw, rehypeKatex] : [rehypeKatex]), [allowHtml]);

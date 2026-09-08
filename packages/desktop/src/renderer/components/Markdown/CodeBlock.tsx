@@ -298,4 +298,4 @@ function CodeBlock(props: CodeBlockProps) {
   );
 }
 
-export default CodeBlock;
+export default React.memo(CodeBlock);
