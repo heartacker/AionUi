@@ -669,6 +669,19 @@
       "empty": "没有匹配的文件",
       "limitReached": "仅显示前 {{count}} 项 — 请缩小范围"
     },
+    "git": {
+      "repoPathPlaceholder": "仓库路径",
+      "filterCommitsPlaceholder": "筛选提交…",
+      "refresh": "刷新",
+      "noCommits": "暂无提交",
+      "aheadBehind": "领先 {{ahead}} / 落后 {{behind}}",
+      "loadLogFailed": "加载 Git 提交记录失败",
+      "readRepoFailed": "读取 Git 仓库出错",
+      "commitDetails": "提交详情",
+      "changedFiles": "变更文件 ({{count}})",
+      "noTextChanges": "此文件没有文本变更。",
+      "selectFileToViewDiff": "选择一个文件查看 Diff"
+    },
     "scm": {
       "notARepository": "该文件夹未纳入版本控制",
       "noChanges": "没有变更",
@@ -749,7 +762,8 @@
         "outcomeUnknown": "连接在收到答复前已重置——此操作可能已完成，也可能未完成。请刷新并核对文件列表，确认后再决定是否重试。",
         "allFailed": "{{count}} 个文件都未能处理",
         "allFailed_one": "{{count}} 个文件都未能处理",
-        "allFailed_other": "{{count}} 个文件都未能处理"
+        "allFailed_other": "{{count}} 个文件都未能处理",
+        "viewGitGraph": "查看 Git 图谱"
       }
     },
     "pathCopied": "已复制路径",

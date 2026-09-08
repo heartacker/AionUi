@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Drawer, Tree, Typography, Spin, Space, Tag } from '@arco-design/web-react';
+import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type { ParsedCommit } from '@process/services/git/gitGraphParser';
 import type { GitFileDiff } from '@process/services/git/gitService';
@@ -18,6 +19,7 @@ interface GitDiffDrawerProps {
 }
 
 export const GitDiffDrawer: React.FC<GitDiffDrawerProps> = ({ visible, repoPath, commit, onClose }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [diffs, setDiffs] = useState<GitFileDiff[]>([]);
   const [selectedFile, setSelectedFile] = useState<GitFileDiff | null>(null);
@@ -39,6 +41,10 @@ export const GitDiffDrawer: React.FC<GitDiffDrawerProps> = ({ visible, repoPath,
             setSelectedFile(res.data[0]);
           }
         }
+      })
+      .catch(() => {
+        // Keep the drawer in its empty state; errors here are already reported
+        // by the shared git log load above.
       })
       .finally(() => {
         setLoading(false);
@@ -64,12 +70,12 @@ export const GitDiffDrawer: React.FC<GitDiffDrawerProps> = ({ visible, repoPath,
         commit ? (
           <div>
             <div className='font-semibold text-15px'>{commit.message}</div>
-            <div className='text-12px text-gray-500 font-normal'>
+            <div className='text-12px text-t-tertiary font-normal'>
               {commit.hash.slice(0, 8)} • {commit.author} • {new Date(commit.timestamp).toLocaleString()}
             </div>
           </div>
         ) : (
-          'Commit Details'
+          t('conversation.explorer.git.commitDetails')
         )
       }
       visible={visible}
@@ -79,9 +85,9 @@ export const GitDiffDrawer: React.FC<GitDiffDrawerProps> = ({ visible, repoPath,
     >
       <Spin loading={loading} style={{ width: '100%', minHeight: 300 }}>
         <div className='flex h-full gap-4'>
-          <div className='w-240px border-r border-gray-100 pr-2 overflow-y-auto'>
+          <div className='w-240px border-r border-[var(--color-border-1)] pr-2 overflow-y-auto'>
             <Typography.Text bold className='mb-2 block text-13px'>
-              Changed Files ({diffs.length})
+              {t('conversation.explorer.git.changedFiles', { count: diffs.length })}
             </Typography.Text>
             <Tree
               treeData={treeData}
@@ -92,11 +98,13 @@ export const GitDiffDrawer: React.FC<GitDiffDrawerProps> = ({ visible, repoPath,
               }}
             />
           </div>
-          <div className='flex-1 overflow-auto bg-gray-50 p-3 rounded text-12px font-mono whitespace-pre-wrap'>
+          <div className='flex-1 overflow-auto bg-[var(--color-fill-1)] p-3 rounded text-12px font-mono whitespace-pre-wrap'>
             {selectedFile ? (
-              selectedFile.diff || 'No text changes in this file.'
+              selectedFile.diff || t('conversation.explorer.git.noTextChanges')
             ) : (
-              <div className='text-gray-400 text-center mt-20'>Select a file to view Diff</div>
+              <div className='text-t-tertiary text-center mt-20'>
+                {t('conversation.explorer.git.selectFileToViewDiff')}
+              </div>
             )}
           </div>
         </div>

@@ -671,6 +671,19 @@
       "empty": "Eşleşen dosya yok",
       "limitReached": "İlk {{count}} gösteriliyor — daraltın"
     },
+    "git": {
+      "repoPathPlaceholder": "Depo yolu",
+      "filterCommitsPlaceholder": "Commit'leri filtrele…",
+      "refresh": "Yenile",
+      "noCommits": "Commit bulunamadı",
+      "aheadBehind": "{{ahead}} ileride, {{behind}} geride",
+      "loadLogFailed": "Git günlüğü yüklenemedi",
+      "readRepoFailed": "Git deposu okunurken hata oluştu",
+      "commitDetails": "Commit ayrıntıları",
+      "changedFiles": "Değiştirilen dosyalar ({{count}})",
+      "noTextChanges": "Bu dosyada metin değişikliği yok.",
+      "selectFileToViewDiff": "Görüntülemek için bir dosya seçin (Diff)"
+    },
     "scm": {
       "notARepository": "Bu klasör sürüm denetiminde değil",
       "noChanges": "Değişiklik yok",
@@ -751,7 +764,8 @@
         "outcomeUnknown": "Yanıt gelmeden bağlantı sıfırlandı — bu işlem tamamlanmış da olabilir, olmamış da. Yeniden denemeden önce yenileyip dosya listesini kontrol edin.",
         "allFailed": "{{count}} dosyanın hiçbiri işlenemedi",
         "allFailed_one": "{{count}} dosyanın hiçbiri işlenemedi",
-        "allFailed_other": "{{count}} dosyanın hiçbiri işlenemedi"
+        "allFailed_other": "{{count}} dosyanın hiçbiri işlenemedi",
+        "viewGitGraph": "Git Grafiğini Görüntüle"
       }
     },
     "pathCopied": "Yol kopyalandı",

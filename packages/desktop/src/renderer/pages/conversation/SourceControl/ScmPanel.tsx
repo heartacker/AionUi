@@ -28,11 +28,25 @@
  */
 
 import { Button, Tooltip } from '@arco-design/web-react';
-import { BranchTwo, FolderCode, FolderCodeOne, Plus, RightBranchOne, TreeList, Undo, ViewList } from '@icon-park/react';
+import {
+  BranchTwo,
+  FolderCode,
+  FolderCodeOne,
+  Plus,
+  RightBranchOne,
+  Timeline,
+  TreeList,
+  Undo,
+  ViewList,
+} from '@icon-park/react';
 import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import useSWR from 'swr';
 
-import { usePreviewContext } from '../Preview';
+import { ipcBridge } from '@/common';
+import type { ProjectDetailDto } from '@/common/types/project';
+
+import { useOptionalPreviewContext } from '../Preview';
 import { discardAllTargets, ScmChangesView, stageAllTargets } from './ScmChangesView';
 import { ScmSection, ScmSectionDivider } from './ScmSection';
 import {
@@ -81,6 +95,37 @@ export const ScmPanel: React.FC<ScmPanelProps> = ({ projectId }) => {
   const view = useScm();
   const ui = useScmUi();
   const actions = useScmActions();
+  // Preview stays optional for this panel: it is rendered where a shared preview
+  // panel exists (conversation explorer), but must not crash when it does not —
+  // the diff/graph features just degrade to no-ops.
+  const previewCtx = useOptionalPreviewContext();
+  const openPreview = previewCtx?.openPreview;
+
+  const { data: projectDetail } = useSWR(projectId ? `explorer-project/${projectId}` : null, (key: string) => {
+    const id = key.slice('explorer-project/'.length);
+    return ipcBridge.project.get.invoke({ project_id: id });
+  });
+
+  const handleOpenGitGraph = React.useCallback(
+    (repo: ScmRepository) => {
+      if (!openPreview) return;
+      let repoPath = '.';
+      const peEntry = projectDetail?.explorer?.entries?.find((e) => e.pe_id === repo.root.pe_id);
+      if (peEntry?.display_path) {
+        const rel = repo.root.relative_path || '';
+        repoPath = rel
+          ? `${peEntry.display_path.replace(/[\\/]+$/, '')}/${rel.replace(/^[\\/]+/, '')}`
+          : peEntry.display_path;
+      }
+      const repoName = repo.pe_name || repo.label;
+      openPreview(repoPath, 'git-graph', {
+        file_name: `Git: ${repoName}`,
+        file_path: repoPath,
+        title: `Git: ${repoName}`,
+      });
+    },
+    [projectDetail, openPreview]
+  );
 
   // Wire the WS runtime (idempotent) and declare the project. Deliberately no
   // cleanup: unmount here means "tab switched", not "project closed". The UI store
@@ -160,6 +205,7 @@ export const ScmPanel: React.FC<ScmPanelProps> = ({ projectId }) => {
         selectedRepo={selectedRepo}
         multiRepo={multiRepo}
         onRepoSelect={setSelectedRepo}
+        onOpenGitGraph={openPreview ? handleOpenGitGraph : undefined}
         onAction={actions.run}
         busy={actions.busy}
         failedRowKeys={actions.report?.failedRowKeys ?? []}
@@ -197,10 +243,11 @@ const ScmSectionStack: React.FC<{
   selectedRepo: ScmRepository;
   multiRepo: boolean;
   onRepoSelect: (repoId: string) => void;
+  onOpenGitGraph?: (repo: ScmRepository) => void;
   onAction: (action: ScmActionKind, repoId: string, resources: ScmResource[]) => void;
   busy: boolean;
   failedRowKeys: string[];
-}> = ({ view, ui, selectedRepo, multiRepo, onRepoSelect, onAction, busy, failedRowKeys }) => {
+}> = ({ view, ui, selectedRepo, multiRepo, onRepoSelect, onOpenGitGraph, onAction, busy, failedRowKeys }) => {
   const { t } = useTranslation();
   const reposCollapsed = ui.collapsed[SECTION_REPOSITORIES] === true;
   const changesCollapsed = ui.collapsed[SECTION_CHANGES] === true;
@@ -311,6 +358,7 @@ const ScmSectionStack: React.FC<{
                 repositories={view.repositories}
                 selectedRepoId={selectedRepo.repo_id}
                 onSelect={onRepoSelect}
+                onOpenGitGraph={onOpenGitGraph}
                 collapsedParents={ui.repoCollapsed}
                 onToggleParent={setRepoWorktreesCollapsed}
               />
@@ -452,12 +500,16 @@ const ScmDiffPreviewBridge: React.FC<{
   resource: ScmResource;
 }> = ({ repoId, staging, resource }) => {
   const { t } = useTranslation();
-  const { openPreview } = usePreviewContext();
+  const previewCtx = useOptionalPreviewContext();
+  const openPreview = previewCtx?.openPreview;
   const name = resourceName(resource);
   const { pe_id: peId, relative_path: relativePath } = resource.file;
   const { from, to } = diffAnchors(resource, staging);
 
   useEffect(() => {
+    // Without a preview panel the bridge is a no-op rather than a crash — the
+    // panel stays usable, only the open-on-select behavior is skipped.
+    if (!openPreview) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -506,43 +558,63 @@ const RepoRow: React.FC<{
   repo: ScmRepository;
   isSelected: boolean;
   onSelect: (repoId: string) => void;
+  onOpenGitGraph?: (repo: ScmRepository) => void;
   indent?: number;
   leading?: React.ReactNode;
-}> = ({ repo, isSelected, onSelect, indent = 0, leading }) => (
-  <div
-    role='button'
-    tabIndex={0}
-    data-scm-repo-item={repo.repo_id}
-    aria-current={isSelected ? 'true' : undefined}
-    onClick={() => onSelect(repo.repo_id)}
-    onKeyDown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onSelect(repo.repo_id);
-      }
-    }}
-    className={`flex items-center gap-6px px-8px py-3px rd-4px cursor-pointer hover:bg-2 min-w-0 ${
-      isSelected ? 'bg-2' : ''
-    }`}
-    style={indent ? { paddingInlineStart: 8 + indent } : undefined}
-  >
-    {leading}
-    <span className='flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-13px text-t-primary'>
-      {repo.pe_name || repo.label}
-    </span>
-    {/* Branch info is pinned to the right of the row (`ms-auto`), the branch
+}> = ({ repo, isSelected, onSelect, onOpenGitGraph, indent = 0, leading }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      role='button'
+      tabIndex={0}
+      data-scm-repo-item={repo.repo_id}
+      aria-current={isSelected ? 'true' : undefined}
+      onClick={() => onSelect(repo.repo_id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(repo.repo_id);
+        }
+      }}
+      className={`group flex items-center gap-6px px-8px py-3px rd-4px cursor-pointer hover:bg-2 min-w-0 ${
+        isSelected ? 'bg-2' : ''
+      }`}
+      style={indent ? { paddingInlineStart: 8 + indent } : undefined}
+    >
+      {leading}
+      <span className='flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-13px text-t-primary'>
+        {repo.pe_name || repo.label}
+      </span>
+      {/* Branch info is pinned to the right of the row (`ms-auto`), the branch
         name preceded by a branch glyph. `flex-1` on the repo name above
         claims the slack so the two never touch; both truncate under pressure.
         Rendered only when a head name is known — a detached/unknown head
         shows nothing rather than a lone icon. */}
-    {repo.head?.name && (
-      <span className='ms-auto flex items-center gap-2px min-w-0 flex-shrink text-t-tertiary text-12px'>
-        <BranchTwo theme='outline' size='12' className='flex-shrink-0' />
-        <span className='overflow-hidden text-ellipsis whitespace-nowrap'>{repo.head.name}</span>
-      </span>
-    )}
-  </div>
-);
+      {repo.head?.name && (
+        <span className='ms-auto flex items-center gap-2px min-w-0 flex-shrink text-t-tertiary text-12px'>
+          <BranchTwo theme='outline' size='12' className='flex-shrink-0' />
+          <span className='overflow-hidden text-ellipsis whitespace-nowrap'>{repo.head.name}</span>
+        </span>
+      )}
+      {onOpenGitGraph && (
+        <Tooltip content={t('conversation.explorer.scm.actions.viewGitGraph')} mini>
+          <Button
+            type='text'
+            size='mini'
+            aria-label={t('conversation.explorer.scm.actions.viewGitGraph')}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenGitGraph(repo);
+            }}
+            className='flex-shrink-0 p-0! w-18px! h-18px! opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-t-tertiary hover:text-t-primary'
+          >
+            <Timeline theme='outline' size='13' />
+          </Button>
+        </Tooltip>
+      )}
+    </div>
+  );
+};
 
 /** The worktree glyph shown at the left of a worktree row (nested child or orphan). */
 const WorktreeGlyph: React.FC<{ label: string }> = ({ label }) => (
@@ -568,10 +640,11 @@ const RepoList: React.FC<{
   repositories: ScmRepository[];
   selectedRepoId: string;
   onSelect: (repoId: string) => void;
+  onOpenGitGraph?: (repo: ScmRepository) => void;
   /** Primary repo ids whose worktree children are currently collapsed. */
   collapsedParents: string[];
   onToggleParent: (repoId: string, collapsed: boolean) => void;
-}> = ({ repositories, selectedRepoId, onSelect, collapsedParents, onToggleParent }) => {
+}> = ({ repositories, selectedRepoId, onSelect, onOpenGitGraph, collapsedParents, onToggleParent }) => {
   const { t } = useTranslation();
   const groups = useMemo(() => groupRepositories(repositories), [repositories]);
   const collapsed = useMemo(() => new Set(collapsedParents), [collapsedParents]);
@@ -595,6 +668,7 @@ const RepoList: React.FC<{
           group={group}
           selectedRepoId={selectedRepoId}
           onSelect={onSelect}
+          onOpenGitGraph={onOpenGitGraph}
           isCollapsed={collapsed.has(group.repo.repo_id)}
           onToggleParent={onToggleParent}
           labels={labels}
@@ -610,16 +684,18 @@ const RepoGroupRows: React.FC<{
   group: ScmRepoGroup;
   selectedRepoId: string;
   onSelect: (repoId: string) => void;
+  onOpenGitGraph?: (repo: ScmRepository) => void;
   isCollapsed: boolean;
   onToggleParent: (repoId: string, collapsed: boolean) => void;
   labels: { worktree: string; expand: string; collapse: string };
-}> = ({ group, selectedRepoId, onSelect, isCollapsed, onToggleParent, labels }) => {
+}> = ({ group, selectedRepoId, onSelect, onOpenGitGraph, isCollapsed, onToggleParent, labels }) => {
   if (group.kind === 'orphanWorktree') {
     return (
       <RepoRow
         repo={group.repo}
         isSelected={group.repo.repo_id === selectedRepoId}
         onSelect={onSelect}
+        onOpenGitGraph={onOpenGitGraph}
         leading={<WorktreeGlyph label={labels.worktree} />}
       />
     );
@@ -635,6 +711,7 @@ const RepoGroupRows: React.FC<{
         repo={group.repo}
         isSelected={group.repo.repo_id === selectedRepoId}
         onSelect={onSelect}
+        onOpenGitGraph={onOpenGitGraph}
         leading={
           hasWorktrees ? (
             <button
@@ -671,6 +748,7 @@ const RepoGroupRows: React.FC<{
             repo={wt}
             isSelected={wt.repo_id === selectedRepoId}
             onSelect={onSelect}
+            onOpenGitGraph={onOpenGitGraph}
             indent={REPO_WORKTREE_INDENT}
             leading={<WorktreeGlyph label={labels.worktree} />}
           />

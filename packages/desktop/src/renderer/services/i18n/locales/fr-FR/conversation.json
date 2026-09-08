@@ -669,6 +669,19 @@
       "empty": "Aucun fichier correspondant",
       "limitReached": "Affichage des {{count}} premiers — affinez la recherche"
     },
+    "git": {
+      "repoPathPlaceholder": "Chemin du dépôt",
+      "filterCommitsPlaceholder": "Filtrer les commits…",
+      "refresh": "Actualiser",
+      "noCommits": "Aucun commit trouvé",
+      "aheadBehind": "{{ahead}} en avance, {{behind}} en retard",
+      "loadLogFailed": "Échec du chargement du journal Git",
+      "readRepoFailed": "Erreur de lecture du dépôt Git",
+      "commitDetails": "Détails du commit",
+      "changedFiles": "Fichiers modifiés ({{count}})",
+      "noTextChanges": "Aucune modification de texte dans ce fichier.",
+      "selectFileToViewDiff": "Sélectionnez un fichier pour voir le diff"
+    },
     "scm": {
       "notARepository": "Ce dossier n'est pas sous gestion de version",
       "noChanges": "Aucune modification",
@@ -749,7 +762,8 @@
         "outcomeUnknown": "La connexion a été réinitialisée avant la réponse — cette action a peut-être abouti, ou non. Actualisez et vérifiez la liste des fichiers avant de réessayer.",
         "allFailed": "Aucun des {{count}} fichier(s) n'a pu être traité",
         "allFailed_one": "{{count}} fichier n'a pas pu être traité",
-        "allFailed_other": "Aucun des {{count}} fichiers n'a pu être traité"
+        "allFailed_other": "Aucun des {{count}} fichiers n'a pu être traité",
+        "viewGitGraph": "Afficher le graphe Git"
       }
     },
     "pathCopied": "Chemin copié",

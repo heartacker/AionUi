@@ -21,3 +21,4 @@ export { default as OfficeDocViewer } from './OfficeDocViewer';
 export { default as ImageViewer } from './ImageViewer';
 export { default as URLViewer } from './URLViewer';
 export { default as DrawioViewer } from './drawio/DrawioViewer';
+export { default as GitGraphViewer } from './GitGraphViewer';

@@ -41,6 +41,7 @@ import OfficeDocPreview from '../viewers/OfficeDocViewer';
 import PptViewer from '../viewers/PptViewer';
 import CodeEditor from '../editors/CodeEditor';
 import URLViewer from '../viewers/URLViewer';
+import GitGraphViewer from '../viewers/GitGraphViewer';
 import DrawioViewer from '../viewers/drawio/DrawioViewer';
 import BrowserTabLayer from '../../browser/BrowserTabLayer';
 import { MAX_BROWSER_TABS } from '../../browser/constants';
@@ -1251,6 +1252,8 @@ const PreviewPanel: React.FC = () => {
     } else if (content_type === 'url') {
       // URL 预览模式 / URL preview mode
       return <URLViewer url={content} title={metadata?.title} />;
+    } else if (content_type === 'git-graph') {
+      return <GitGraphViewer repoPath={content || metadata?.file_path || '.'} />;
     }
 
     return null;

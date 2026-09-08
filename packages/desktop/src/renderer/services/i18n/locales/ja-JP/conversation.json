@@ -669,6 +669,19 @@
       "empty": "一致するファイルがありません",
       "limitReached": "最初の {{count}} 件を表示 — 絞り込んでください"
     },
+    "git": {
+      "repoPathPlaceholder": "リポジトリのパス",
+      "filterCommitsPlaceholder": "コミットを絞り込む…",
+      "refresh": "更新",
+      "noCommits": "コミットがありません",
+      "aheadBehind": "{{ahead}} 進み / {{behind}} 遅れ",
+      "loadLogFailed": "コミット履歴の読み込みに失敗しました",
+      "readRepoFailed": "リポジトリの読み込み中にエラーが発生しました",
+      "commitDetails": "コミットの詳細",
+      "changedFiles": "変更されたファイル ({{count}})",
+      "noTextChanges": "このファイルにテキスト変更はありません。",
+      "selectFileToViewDiff": "Diff を表示するファイルを選択してください"
+    },
     "scm": {
       "notARepository": "このフォルダーはバージョン管理されていません",
       "noChanges": "変更はありません",
@@ -749,7 +762,8 @@
         "outcomeUnknown": "応答が届く前に接続がリセットされました——この操作は完了した可能性も、していない可能性もあります。再試行の前に更新してファイル一覧を確認してください。",
         "allFailed": "{{count}} 個のファイルはいずれも処理できませんでした",
         "allFailed_one": "{{count}} 個のファイルはいずれも処理できませんでした",
-        "allFailed_other": "{{count}} 個のファイルはいずれも処理できませんでした"
+        "allFailed_other": "{{count}} 個のファイルはいずれも処理できませんでした",
+        "viewGitGraph": "Git グラフを表示"
       }
     },
     "pathCopied": "パスをコピーしました",

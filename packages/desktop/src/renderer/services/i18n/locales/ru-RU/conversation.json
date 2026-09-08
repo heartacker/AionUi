@@ -677,6 +677,19 @@
       "empty": "Нет совпадающих файлов",
       "limitReached": "Показаны первые {{count}} — уточните запрос"
     },
+    "git": {
+      "repoPathPlaceholder": "Путь к репозиторию",
+      "filterCommitsPlaceholder": "Фильтровать коммиты…",
+      "refresh": "Обновить",
+      "noCommits": "Коммиты не найдены",
+      "aheadBehind": "впереди {{ahead}}, позади {{behind}}",
+      "loadLogFailed": "Не удалось загрузить журнал Git",
+      "readRepoFailed": "Ошибка чтения репозитория Git",
+      "commitDetails": "Сведения о коммите",
+      "changedFiles": "Изменённые файлы ({{count}})",
+      "noTextChanges": "В этом файле нет текстовых изменений.",
+      "selectFileToViewDiff": "Выберите файл для просмотра diff"
+    },
     "scm": {
       "notARepository": "Эта папка не под контролем версий",
       "noChanges": "Нет изменений",
@@ -765,7 +778,8 @@
         "allFailed_one": "Не удалось обработать {{count}} файл",
         "allFailed_other": "Не удалось обработать ни один из {{count}} файлов",
         "allFailed_few": "Не удалось обработать ни один из {{count}} файлов",
-        "allFailed_many": "Не удалось обработать ни один из {{count}} файлов"
+        "allFailed_many": "Не удалось обработать ни один из {{count}} файлов",
+        "viewGitGraph": "Показать Git Graph"
       }
     },
     "pathCopied": "Путь скопирован",

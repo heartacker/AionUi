@@ -30,7 +30,7 @@ export const GitCommitList: React.FC<GitCommitListProps> = ({ commits, onSelectC
             key={commit.hash}
             onClick={() => onSelectCommit(commit)}
             style={{ height: `${rowHeight}px` }}
-            className='flex items-center gap-3 px-3 hover:bg-gray-100/70 cursor-pointer border-b border-gray-50 text-13px transition-colors select-none'
+            className='flex items-center gap-3 px-3 hover:bg-[var(--color-fill-2)] cursor-pointer border-b border-[var(--color-border-1)] text-13px transition-colors select-none'
           >
             {/* 分支与标签 Tag */}
             {commit.refs.length > 0 && (
@@ -48,20 +48,20 @@ export const GitCommitList: React.FC<GitCommitListProps> = ({ commits, onSelectC
             )}
 
             {/* 提交信息 */}
-            <Typography.Text ellipsis className='flex-1 font-medium text-gray-800'>
+            <Typography.Text ellipsis className='flex-1 font-medium text-t-primary'>
               {commit.message}
             </Typography.Text>
 
             {/* 作者 */}
-            <span className='text-12px text-gray-400 shrink-0 w-80px truncate text-right'>{commit.author}</span>
+            <span className='text-12px text-t-tertiary shrink-0 w-80px truncate text-right'>{commit.author}</span>
 
             {/* 日期 */}
-            <span className='text-12px text-gray-400 shrink-0 w-110px text-right'>
+            <span className='text-12px text-t-tertiary shrink-0 w-110px text-right'>
               {new Date(commit.timestamp).toLocaleDateString()}
             </span>
 
             {/* Commit Hash */}
-            <span className='text-12px font-mono text-gray-400 shrink-0 w-65px text-right'>
+            <span className='text-12px font-mono text-t-tertiary shrink-0 w-65px text-right'>
               {commit.hash.slice(0, 7)}
             </span>
           </div>

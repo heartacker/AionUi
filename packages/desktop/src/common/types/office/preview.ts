@@ -25,7 +25,8 @@ export type PreviewContentType =
   | 'unsupported'
   | 'url'
   | 'browser'
-  | 'drawio';
+  | 'drawio'
+  | 'git-graph';
 
 export interface RemoteImageFetchRequest {
   url: string;

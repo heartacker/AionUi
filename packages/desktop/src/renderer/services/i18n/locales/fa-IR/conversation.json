@@ -669,6 +669,19 @@
       "empty": "هیچ فایلی مطابقت ندارد",
       "limitReached": "نمایش {{count}} مورد اول — جستجو را محدود کنید"
     },
+    "git": {
+      "repoPathPlaceholder": "مسیر مخزن",
+      "filterCommitsPlaceholder": "فیلتر کردن کامیتها…",
+      "refresh": "تازهسازی",
+      "noCommits": "هیچ کامیتی یافت نشد",
+      "aheadBehind": "{{ahead}} جلوتر، {{behind}} عقبتر",
+      "loadLogFailed": "بارگذاری گزارش گیت ناموفق بود",
+      "readRepoFailed": "خطا در خواندن مخزن گیت",
+      "commitDetails": "جزئیات کامیت",
+      "changedFiles": "فایلهای تغییر یافته ({{count}})",
+      "noTextChanges": "هیچ تغییر متنی در این فایل وجود ندارد.",
+      "selectFileToViewDiff": "برای مشاهدهٔ Diff یک فایل انتخاب کنید"
+    },
     "scm": {
       "notARepository": "این پوشه تحت کنترل نسخه نیست",
       "noChanges": "تغییری وجود ندارد",
@@ -749,7 +762,8 @@
         "outcomeUnknown": "پیش از رسیدن پاسخ، اتصال بازنشانی شد — این عمل ممکن است کامل شده باشد یا نه. پیش از تلاش دوباره، بازخوانی کنید و فهرست پرونده‌ها را بررسی کنید.",
         "allFailed": "هیچ‌یک از {{count}} پرونده پردازش نشد",
         "allFailed_one": "هیچ‌یک از {{count}} پرونده پردازش نشد",
-        "allFailed_other": "هیچ‌یک از {{count}} پرونده پردازش نشد"
+        "allFailed_other": "هیچ‌یک از {{count}} پرونده پردازش نشد",
+        "viewGitGraph": "نمایش نمودار گیت"
       }
     },
     "pathCopied": "مسیر کپی شد",

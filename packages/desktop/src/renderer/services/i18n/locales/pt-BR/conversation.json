@@ -675,6 +675,19 @@
       "empty": "Nenhum arquivo corresponde",
       "limitReached": "Mostrando os primeiros {{count}} — refine a busca"
     },
+    "git": {
+      "repoPathPlaceholder": "Caminho do repositório",
+      "filterCommitsPlaceholder": "Filtrar commits…",
+      "refresh": "Atualizar",
+      "noCommits": "Nenhum commit encontrado",
+      "aheadBehind": "{{ahead}} à frente, {{behind}} atrás",
+      "loadLogFailed": "Falha ao carregar o log do Git",
+      "readRepoFailed": "Erro ao ler o repositório Git",
+      "commitDetails": "Detalhes do commit",
+      "changedFiles": "Arquivos alterados ({{count}})",
+      "noTextChanges": "Nenhuma alteração de texto neste arquivo.",
+      "selectFileToViewDiff": "Selecione um arquivo para ver o diff"
+    },
     "scm": {
       "notARepository": "Esta pasta não está sob controle de versão",
       "noChanges": "Nenhuma alteração",
@@ -755,7 +768,8 @@
         "outcomeUnknown": "A conexão foi reiniciada antes da resposta — esta ação pode ou não ter sido concluída. Atualize e confira a lista de arquivos antes de tentar de novo.",
         "allFailed": "Nenhum dos {{count}} arquivo(s) pôde ser processado",
         "allFailed_one": "Não foi possível processar {{count}} arquivo",
-        "allFailed_other": "Nenhum dos {{count}} arquivos pôde ser processado"
+        "allFailed_other": "Nenhum dos {{count}} arquivos pôde ser processado",
+        "viewGitGraph": "Ver gráfico do Git"
       }
     },
     "pathCopied": "Caminho copiado",

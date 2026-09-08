@@ -669,6 +669,19 @@
       "empty": "일치하는 파일이 없습니다",
       "limitReached": "처음 {{count}}개 표시 — 범위를 좁혀 주세요"
     },
+    "git": {
+      "repoPathPlaceholder": "저장소 경로",
+      "filterCommitsPlaceholder": "커밋 필터링…",
+      "refresh": "새로고침",
+      "noCommits": "커밋이 없습니다",
+      "aheadBehind": "{{ahead}} 앞 / {{behind}} 뒤",
+      "loadLogFailed": "Git 로그를 불러오지 못했습니다",
+      "readRepoFailed": "Git 저장소를 읽는 중 오류가 발생했습니다",
+      "commitDetails": "커밋 상세",
+      "changedFiles": "변경된 파일 ({{count}})",
+      "noTextChanges": "이 파일에는 텍스트 변경이 없습니다.",
+      "selectFileToViewDiff": "Diff를 볼 파일을 선택하세요"
+    },
     "scm": {
       "notARepository": "이 폴더는 버전 관리 대상이 아닙니다",
       "noChanges": "변경 사항 없음",
@@ -749,7 +762,8 @@
         "outcomeUnknown": "응답이 오기 전에 연결이 재설정되었습니다 — 이 작업은 완료되었을 수도, 되지 않았을 수도 있습니다. 다시 시도하기 전에 새로 고쳐 파일 목록을 확인하세요.",
         "allFailed": "{{count}}개 파일을 모두 처리하지 못했습니다",
         "allFailed_one": "{{count}}개 파일을 모두 처리하지 못했습니다",
-        "allFailed_other": "{{count}}개 파일을 모두 처리하지 못했습니다"
+        "allFailed_other": "{{count}}개 파일을 모두 처리하지 못했습니다",
+        "viewGitGraph": "Git 그래프 보기"
       }
     },
     "pathCopied": "경로가 복사되었습니다",

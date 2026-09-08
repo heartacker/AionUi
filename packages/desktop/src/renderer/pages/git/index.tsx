@@ -5,8 +5,9 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Input, Select, Space, Spin, Message, Empty } from '@arco-design/web-react';
-import { IconRefresh, IconBranch, IconFolder } from '@arco-design/web-react/icon';
+import { Button, Input, Space, Spin, Message, Empty } from '@arco-design/web-react';
+import { BranchTwo, FolderCodeOne, Refresh } from '@icon-park/react';
+import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type { ParsedCommit } from '@process/services/git/gitGraphParser';
 import type { GitStatusSummary } from '@process/services/git/gitService';
@@ -18,12 +19,19 @@ interface GitViewProps {
 }
 
 export const GitView: React.FC<GitViewProps> = ({ initialRepoPath = '.' }) => {
+  const { t } = useTranslation();
   const [repoPath, setRepoPath] = useState(initialRepoPath);
   const [loading, setLoading] = useState(false);
   const [commits, setCommits] = useState<ParsedCommit[]>([]);
   const [status, setStatus] = useState<GitStatusSummary | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<ParsedCommit | null>(null);
   const [filterText, setFilterText] = useState('');
+
+  useEffect(() => {
+    if (initialRepoPath && initialRepoPath !== repoPath) {
+      setRepoPath(initialRepoPath);
+    }
+  }, [initialRepoPath]);
 
   const loadData = useCallback(async () => {
     if (!repoPath) return;
@@ -37,18 +45,18 @@ export const GitView: React.FC<GitViewProps> = ({ initialRepoPath = '.' }) => {
       if (logRes.success && logRes.data) {
         setCommits(logRes.data);
       } else {
-        Message.error(logRes.msg || 'Failed to load git log');
+        Message.error(logRes.msg || t('conversation.explorer.git.loadLogFailed'));
       }
 
       if (statusRes.success && statusRes.data) {
         setStatus(statusRes.data);
       }
     } catch (err: unknown) {
-      Message.error(err instanceof Error ? err.message : 'Error reading git repository');
+      Message.error(err instanceof Error ? err.message : t('conversation.explorer.git.readRepoFailed'));
     } finally {
       setLoading(false);
     }
-  }, [repoPath]);
+  }, [repoPath, t]);
 
   useEffect(() => {
     loadData();
@@ -62,26 +70,26 @@ export const GitView: React.FC<GitViewProps> = ({ initialRepoPath = '.' }) => {
   );
 
   return (
-    <div className='flex flex-col h-full w-full bg-white dark:bg-[#1e1e20] p-4 overflow-hidden'>
+    <div className='flex flex-col h-full w-full bg-[var(--color-bg-1)] p-4 overflow-hidden'>
       {/* 顶部工具栏 */}
-      <div className='flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-800'>
+      <div className='flex items-center justify-between pb-3 mb-3 border-b border-[var(--color-border-1)]'>
         <Space size='medium'>
           <Input
-            prefix={<IconFolder />}
+            prefix={<FolderCodeOne theme='outline' size='16' />}
             value={repoPath}
-            placeholder='Repository Path'
+            placeholder={t('conversation.explorer.git.repoPathPlaceholder')}
             onChange={setRepoPath}
             onPressEnter={loadData}
             style={{ width: 280 }}
           />
 
           {status && (
-            <div className='flex items-center gap-2 text-13px text-gray-600 dark:text-gray-300'>
-              <IconBranch className='text-blue-500' />
+            <div className='flex items-center gap-2 text-13px text-t-secondary'>
+              <BranchTwo theme='outline' size='16' fill='var(--color-primary-6)' />
               <span className='font-semibold'>{status.currentBranch}</span>
               {status.trackingBranch && (
-                <span className='text-gray-400 text-12px'>
-                  (ahead {status.ahead}, behind {status.behind})
+                <span className='text-t-tertiary text-12px'>
+                  {t('conversation.explorer.git.aheadBehind', { ahead: status.ahead, behind: status.behind })}
                 </span>
               )}
             </div>
@@ -90,14 +98,14 @@ export const GitView: React.FC<GitViewProps> = ({ initialRepoPath = '.' }) => {
 
         <Space>
           <Input.Search
-            placeholder='Filter commits...'
+            placeholder={t('conversation.explorer.git.filterCommitsPlaceholder')}
             value={filterText}
             onChange={setFilterText}
             style={{ width: 220 }}
             allowClear
           />
-          <Button icon={<IconRefresh />} loading={loading} onClick={loadData}>
-            Refresh
+          <Button icon={<Refresh theme='outline' size='16' />} loading={loading} onClick={loadData}>
+            {t('conversation.explorer.git.refresh')}
           </Button>
         </Space>
       </div>
@@ -108,7 +116,7 @@ export const GitView: React.FC<GitViewProps> = ({ initialRepoPath = '.' }) => {
           {filteredCommits.length > 0 ? (
             <GitCommitList commits={filteredCommits} onSelectCommit={setSelectedCommit} />
           ) : (
-            !loading && <Empty description='No commits found' className='mt-20' />
+            !loading && <Empty description={t('conversation.explorer.git.noCommits')} className='mt-20' />
           )}
         </Spin>
       </div>

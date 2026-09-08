@@ -233,7 +233,14 @@ const MAX_PERSISTED_TAB_CONTENT_LENGTH = 80_000;
  * office renders through its own process, and an unsupported format has nothing to
  * render. Reloading these means telling their viewer to re-fetch, not re-reading text.
  */
-const CONTENT_FREE_PREVIEW_TYPES = new Set<PreviewContentType>(['pdf', 'word', 'excel', 'ppt', 'unsupported']);
+const CONTENT_FREE_PREVIEW_TYPES = new Set<PreviewContentType>([
+  'pdf',
+  'word',
+  'excel',
+  'ppt',
+  'unsupported',
+  'git-graph',
+]);
 
 /**
  * Types whose content can be fetched again from the file, so storing it is pointless.

@@ -677,6 +677,19 @@
       "empty": "Немає відповідних файлів",
       "limitReached": "Показано перші {{count}} — уточніть запит"
     },
+    "git": {
+      "repoPathPlaceholder": "Шлях до репозиторію",
+      "filterCommitsPlaceholder": "Фільтрувати комміти…",
+      "refresh": "Оновити",
+      "noCommits": "Комміти не знайдено",
+      "aheadBehind": "попереду {{ahead}}, позаду {{behind}}",
+      "loadLogFailed": "Не вдалося завантажити журнал Git",
+      "readRepoFailed": "Помилка читання репозиторію Git",
+      "commitDetails": "Деталі комміта",
+      "changedFiles": "Змінені файли ({{count}})",
+      "noTextChanges": "У цьому файлі немає текстових змін.",
+      "selectFileToViewDiff": "Виберіть файл для перегляду diff"
+    },
     "scm": {
       "notARepository": "Ця тека не під контролем версій",
       "noChanges": "Немає змін",
@@ -765,7 +778,8 @@
         "allFailed_one": "Не вдалося обробити {{count}} файл",
         "allFailed_other": "Жоден із {{count}} файлів не вдалося обробити",
         "allFailed_few": "Жоден із {{count}} файлів не вдалося обробити",
-        "allFailed_many": "Жоден із {{count}} файлів не вдалося обробити"
+        "allFailed_many": "Жоден із {{count}} файлів не вдалося обробити",
+        "viewGitGraph": "Показати Git Graph"
       }
     },
     "pathCopied": "Шлях скопійовано",

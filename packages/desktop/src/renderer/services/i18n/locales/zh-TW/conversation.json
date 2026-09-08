@@ -669,6 +669,19 @@
       "empty": "沒有符合的檔案",
       "limitReached": "僅顯示前 {{count}} 項 — 請縮小範圍"
     },
+    "git": {
+      "repoPathPlaceholder": "儲存庫路徑",
+      "filterCommitsPlaceholder": "篩選提交…",
+      "refresh": "重新整理",
+      "noCommits": "尚無提交",
+      "aheadBehind": "領先 {{ahead}} / 落後 {{behind}}",
+      "loadLogFailed": "載入 Git 提交記錄失敗",
+      "readRepoFailed": "讀取 Git 儲存庫失敗",
+      "commitDetails": "提交詳細資料",
+      "changedFiles": "變更檔案 ({{count}})",
+      "noTextChanges": "此檔案沒有文字變更。",
+      "selectFileToViewDiff": "選擇檔案以檢視 Diff"
+    },
     "scm": {
       "notARepository": "該資料夾未納入版本控制",
       "noChanges": "沒有變更",
@@ -749,7 +762,8 @@
         "outcomeUnknown": "連線在收到回覆前已重設——此操作可能已完成，也可能未完成。請重新整理並核對檔案清單，確認後再決定是否重試。",
         "allFailed": "{{count}} 個檔案都未能處理",
         "allFailed_one": "{{count}} 個檔案都未能處理",
-        "allFailed_other": "{{count}} 個檔案都未能處理"
+        "allFailed_other": "{{count}} 個檔案都未能處理",
+        "viewGitGraph": "檢視 Git 圖譜"
       }
     },
     "pathCopied": "已複製路徑",

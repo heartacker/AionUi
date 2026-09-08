@@ -2509,21 +2509,98 @@ export const sidebar = {
 // Git — Electron-native Git Service
 // ---------------------------------------------------------------------------
 
+// httpPost unwraps the backend envelope ({ success, data }) and returns the bare
+// payload, so the web providers are typed as payload types below, then re-wrapped
+// into the IBridgeResponse envelope the rest of the renderer consumes.
+const toGitFailure = (error: unknown): IBridgeResponse<never> => ({
+  success: false,
+  msg: error instanceof Error ? error.message : String(error),
+});
+
+const nativeGitGetLog = bridge.buildProvider<
+  IBridgeResponse<import('@process/services/git/gitGraphParser').ParsedCommit[]>,
+  { repoPath: string; limit?: number }
+>('git.get-log');
+const webGitGetLog = httpPost<
+  import('@process/services/git/gitGraphParser').ParsedCommit[],
+  {
+    repoPath: string;
+    limit?: number;
+  }
+>('/api/git/log');
+
+const nativeGitGetStatus = bridge.buildProvider<
+  IBridgeResponse<import('@process/services/git/gitService').GitStatusSummary>,
+  { repoPath: string }
+>('git.get-status');
+const webGitGetStatus = httpPost<
+  import('@process/services/git/gitService').GitStatusSummary,
+  {
+    repoPath: string;
+  }
+>('/api/git/status');
+
+const nativeGitGetCommitDiff = bridge.buildProvider<
+  IBridgeResponse<import('@process/services/git/gitService').GitFileDiff[]>,
+  { repoPath: string; hash: string }
+>('git.get-commit-diff');
+const webGitGetCommitDiff = httpPost<
+  import('@process/services/git/gitService').GitFileDiff[],
+  {
+    repoPath: string;
+    hash: string;
+  }
+>('/api/git/commit-diff');
+
+const nativeGitCheckout = bridge.buildProvider<
+  IBridgeResponse<{ success: boolean; message: string }>,
+  { repoPath: string; branchName: string }
+>('git.checkout');
+
 export const git = {
-  getLog: bridge.buildProvider<
-    IBridgeResponse<import('@process/services/git/gitGraphParser').ParsedCommit[]>,
-    { repoPath: string; limit?: number }
-  >('git.get-log'),
-  getStatus: bridge.buildProvider<
-    IBridgeResponse<import('@process/services/git/gitService').GitStatusSummary>,
-    { repoPath: string }
-  >('git.get-status'),
-  getCommitDiff: bridge.buildProvider<
-    IBridgeResponse<import('@process/services/git/gitService').GitFileDiff[]>,
-    { repoPath: string; hash: string }
-  >('git.get-commit-diff'),
-  checkout: bridge.buildProvider<
-    IBridgeResponse<{ success: boolean; message: string }>,
-    { repoPath: string; branchName: string }
-  >('git.checkout'),
+  getLog: {
+    provider: nativeGitGetLog.provider,
+    invoke: async (params: { repoPath: string; limit?: number }) => {
+      if (isElectronRenderer()) return nativeGitGetLog.invoke(params);
+      try {
+        const data = await webGitGetLog.invoke(params);
+        return { success: true, data };
+      } catch (error) {
+        return toGitFailure(error);
+      }
+    },
+  },
+  getStatus: {
+    provider: nativeGitGetStatus.provider,
+    invoke: async (params: { repoPath: string }) => {
+      if (isElectronRenderer()) return nativeGitGetStatus.invoke(params);
+      try {
+        const data = await webGitGetStatus.invoke(params);
+        return { success: true, data };
+      } catch (error) {
+        return toGitFailure(error);
+      }
+    },
+  },
+  getCommitDiff: {
+    provider: nativeGitGetCommitDiff.provider,
+    invoke: async (params: { repoPath: string; hash: string }) => {
+      if (isElectronRenderer()) return nativeGitGetCommitDiff.invoke(params);
+      try {
+        const data = await webGitGetCommitDiff.invoke(params);
+        return { success: true, data };
+      } catch (error) {
+        return toGitFailure(error);
+      }
+    },
+  },
+  checkout: {
+    provider: nativeGitCheckout.provider,
+    invoke: async (params: { repoPath: string; branchName: string }) => {
+      if (isElectronRenderer()) return nativeGitCheckout.invoke(params);
+      // WebUI has no mutating git surface yet; fail with the envelope contract so
+      // callers can distinguish "unsupported here" from a transport error.
+      return { success: false, msg: 'Checkout is not supported in WebUI' };
+    },
+  },
 };

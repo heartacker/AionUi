@@ -7,13 +7,17 @@
  * /api/auth/*. /ws and /api/stt/stream are WebSocket/stream upgrades spliced at
  * TCP level; /api/stt/stream is the STT streaming endpoint.
  *
- * Design: Node native http + serve-handler. No Express. No business routes.
+ * Design: Node native http + serve-handler. No Express. The only business
+ * routes served locally are /api/git/* (WebUI git history/diff, since git must
+ * run on this host — see handleGitApiRoute); everything else under /api/* is
+ * proxied to the backend.
  */
 
 import http, { type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import net, { type Socket } from 'node:net';
 import serveHandler from 'serve-handler';
+import { handleGitGetCommitDiff, handleGitGetLog, handleGitGetStatus } from './git-handler';
 
 export type StaticServerOptions = {
   staticDir: string;
@@ -74,6 +78,126 @@ export function pickLanIP(nets: ReturnType<typeof networkInterfaces>): string | 
 
 function getLanIP(): string | null {
   return pickLanIP(networkInterfaces());
+}
+
+// ---------------------------------------------------------------------------
+// Git API (/api/git/*) — local handlers, WebUI mode
+// ---------------------------------------------------------------------------
+//
+// Unlike the rest of /api/* these are NOT reverse-proxied: git must execute on
+// the host that owns the repositories, and aioncore has no git endpoints. The
+// routes are deliberately restricted to keep the surface small:
+//   - POST only — a bare GET/query-string request must never be able to run
+//     git, otherwise any <img>/<script> embed could trigger it.
+//   - repoPath must be an absolute POSIX path or Windows drive path. A remote
+//     client has no meaningful relative-path context on this host; the
+//     renderer always resolves repo roots to host paths first.
+//   - commit hashes must be plain hex object ids — a leading `-` would
+//     otherwise be parsed as a git option.
+//   - limit is clamped to [1, GIT_LIMIT_MAX].
+//
+// Errors use { error } bodies with 4xx/5xx statuses, matching the envelope the
+// renderer's HTTP bridge throws on non-2xx responses.
+//
+// TODO(security): these endpoints currently trust the caller the same way the
+// static SPA does — wire session verification against aioncore before exposing
+// git history/diffs to anything beyond a trusted local user.
+
+const GIT_LIMIT_MAX = 500;
+const GIT_HASH_RE = /^[0-9a-f]{4,64}$/;
+const GIT_BODY_MAX_BYTES = 1024 * 1024;
+
+const isAbsoluteFsPath = (p: string): boolean => p.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(p);
+
+function writeGitJson(res: ServerResponse, status: number, payload: unknown): void {
+  if (res.headersSent) return;
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(payload));
+}
+
+function readGitBody(req: IncomingMessage, res: ServerResponse): Promise<Record<string, unknown> | null> {
+  return (async () => {
+    let raw = '';
+    for await (const chunk of req) {
+      const part = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+      raw += part;
+      if (raw.length > GIT_BODY_MAX_BYTES) {
+        writeGitJson(res, 413, { error: 'Request body too large' });
+        return null;
+      }
+    }
+    if (!raw) return {};
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+      writeGitJson(res, 400, { error: 'Invalid JSON body' });
+      return null;
+    } catch {
+      writeGitJson(res, 400, { error: 'Invalid JSON body' });
+      return null;
+    }
+  })();
+}
+
+async function handleGitApiRoute(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'content-type': 'application/json', Allow: 'POST' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  const pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname;
+  const isLog = pathname === '/api/git/log';
+  const isStatus = pathname === '/api/git/status';
+  const isCommitDiff = pathname === '/api/git/commit-diff';
+  if (!isLog && !isStatus && !isCommitDiff) {
+    writeGitJson(res, 404, { error: 'Not found' });
+    return;
+  }
+
+  const body = await readGitBody(req, res);
+  if (body === null) return;
+
+  const repoPath = typeof body.repoPath === 'string' ? body.repoPath.trim() : '';
+  if (!repoPath || !isAbsoluteFsPath(repoPath)) {
+    writeGitJson(res, 400, { error: 'repoPath must be an absolute path' });
+    return;
+  }
+
+  try {
+    if (isLog) {
+      const limitRaw = body.limit;
+      const limit =
+        typeof limitRaw === 'number'
+          ? limitRaw
+          : typeof limitRaw === 'string' && limitRaw.trim() !== ''
+            ? Number(limitRaw)
+            : 200;
+      if (!Number.isInteger(limit) || limit < 1 || limit > GIT_LIMIT_MAX) {
+        writeGitJson(res, 400, { error: `limit must be an integer between 1 and ${GIT_LIMIT_MAX}` });
+        return;
+      }
+      const data = await handleGitGetLog(repoPath, limit);
+      writeGitJson(res, 200, { success: true, data });
+      return;
+    }
+
+    if (isStatus) {
+      const data = await handleGitGetStatus(repoPath);
+      writeGitJson(res, 200, { success: true, data });
+      return;
+    }
+
+    const hash = typeof body.hash === 'string' ? body.hash.trim() : '';
+    if (!GIT_HASH_RE.test(hash)) {
+      writeGitJson(res, 400, { error: 'hash must be a git object id (hex)' });
+      return;
+    }
+    const data = await handleGitGetCommitDiff(repoPath, hash);
+    writeGitJson(res, 200, { success: true, data });
+  } catch (gitErr) {
+    writeGitJson(res, 500, { error: gitErr instanceof Error ? gitErr.message : String(gitErr) });
+  }
 }
 
 function forwardToBackend(req: IncomingMessage, res: ServerResponse, backendPort: number): void {
@@ -177,6 +301,12 @@ export async function startStaticServer(opts: StaticServerOptions): Promise<Stat
     try {
       if (!req.url || !req.method) {
         res.writeHead(400).end();
+        return;
+      }
+
+      // Git API endpoints handled locally by web-host static-server (WebUI mode).
+      if (req.url.startsWith('/api/git/')) {
+        await handleGitApiRoute(req, res);
         return;
       }
 

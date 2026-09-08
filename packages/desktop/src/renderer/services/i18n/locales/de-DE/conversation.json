@@ -670,6 +670,19 @@
       "empty": "Keine passenden Dateien",
       "limitReached": "Erste {{count}} werden angezeigt — eingrenzen"
     },
+    "git": {
+      "repoPathPlaceholder": "Repository-Pfad",
+      "filterCommitsPlaceholder": "Commits filtern…",
+      "refresh": "Aktualisieren",
+      "noCommits": "Keine Commits gefunden",
+      "aheadBehind": "{{ahead}} voraus, {{behind}} zurück",
+      "loadLogFailed": "Git-Log konnte nicht geladen werden",
+      "readRepoFailed": "Fehler beim Lesen des Git-Repositorys",
+      "commitDetails": "Commit-Details",
+      "changedFiles": "Geänderte Dateien ({{count}})",
+      "noTextChanges": "Keine Textänderungen in dieser Datei.",
+      "selectFileToViewDiff": "Datei zum Anzeigen des Diffs auswählen"
+    },
     "scm": {
       "notARepository": "Dieser Ordner steht nicht unter Versionskontrolle",
       "noChanges": "Keine Änderungen",
@@ -750,7 +763,8 @@
         "outcomeUnknown": "Die Verbindung wurde vor einer Antwort zurückgesetzt — diese Aktion kann abgeschlossen sein oder auch nicht. Aktualisieren und die Dateiliste prüfen, bevor Sie es erneut versuchen.",
         "allFailed": "Keine der {{count}} Datei(en) konnte verarbeitet werden",
         "allFailed_one": "{{count}} Datei konnte nicht verarbeitet werden",
-        "allFailed_other": "Keine der {{count}} Dateien konnte verarbeitet werden"
+        "allFailed_other": "Keine der {{count}} Dateien konnte verarbeitet werden",
+        "viewGitGraph": "Git-Graph anzeigen"
       }
     },
     "pathCopied": "Pfad kopiert",

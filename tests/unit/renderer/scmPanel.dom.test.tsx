@@ -27,8 +27,10 @@ vi.mock('@/renderer/pages/conversation/SourceControl/scmTransport', () => ({
 // without a real PreviewProvider, so we mock the Preview module and capture the
 // `openPreview` calls to assert what tab the panel would open.
 const openPreviewMock = vi.fn();
+const previewCtxValue = { openPreview: openPreviewMock };
 vi.mock('@/renderer/pages/conversation/Preview', () => ({
-  usePreviewContext: () => ({ openPreview: openPreviewMock }),
+  usePreviewContext: () => previewCtxValue,
+  useOptionalPreviewContext: () => previewCtxValue,
 }));
 
 import { ScmPanel } from '@/renderer/pages/conversation/SourceControl/ScmPanel';
@@ -954,5 +956,26 @@ describe('ScmPanel bottom-anchored section stack', () => {
     // when the panel is unmeasured in jsdom) → 24 + 240 = 264px.
     await waitFor(() => expect(changesSlot().style.height).toBe('264px'));
     expect(localStorage.getItem('scm-ui:p1') ?? '').not.toContain('"changes":150');
+  });
+
+  it('opens git-graph preview when clicking the viewGitGraph button on a repo', async () => {
+    installPort({ repositories: twoRepos, firstFrames: twoRepoFrames });
+    render(<ScmPanel projectId='p1' />);
+    await screen.findByText('a.ts');
+
+    const graphButtons = screen.getAllByRole('button', { name: 'conversation.explorer.scm.actions.viewGitGraph' });
+    expect(graphButtons.length).toBeGreaterThan(0);
+
+    openPreviewMock.mockClear();
+    fireEvent.click(graphButtons[0]);
+
+    expect(openPreviewMock).toHaveBeenCalledWith(
+      '.',
+      'git-graph',
+      expect.objectContaining({
+        file_name: 'Git: aion',
+        title: 'Git: aion',
+      })
+    );
   });
 });

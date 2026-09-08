@@ -78,5 +78,10 @@ export const reflessTabKey = (type: PreviewContentType, content?: string, meta?:
     return `diff${SEP}${fileName}${SEP}${hashText(content)}`;
   }
 
+  if (type === 'git-graph') {
+    const repoPath = content?.trim() ?? meta?.file_path?.trim() ?? '';
+    return `git-graph${SEP}${repoPath}`;
+  }
+
   return null;
 };
