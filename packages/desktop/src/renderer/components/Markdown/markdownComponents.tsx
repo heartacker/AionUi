@@ -61,6 +61,14 @@ export const SANITIZED_HTML_REHYPE_PLUGINS: ReactMarkdownOptions['rehypePlugins'
   rehypeKatex,
 ];
 
+/**
+ * Default rehype pipeline for chat and standard markdown surfaces.
+ * Uses rehype-raw with sanitized HTML tags (rehypeSanitize) followed by KaTeX.
+ * This allows benign tags like `<kbd>` while stripping dangerous
+ * markup (`<script>`, `<iframe>`, inline event handlers, etc.).
+ */
+export const DEFAULT_REHYPE_PLUGINS = SANITIZED_HTML_REHYPE_PLUGINS;
+
 /** Table override shared by the chat and preview renderers: horizontal scroll + collapsed borders. */
 export const MarkdownTable = ({ node: _node, ...rest }: Record<string, unknown>) => (
   <div style={{ overflowX: 'auto', maxWidth: '100%' }}>

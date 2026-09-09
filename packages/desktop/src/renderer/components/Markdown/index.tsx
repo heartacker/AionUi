@@ -26,7 +26,7 @@ import CodeBlock from './CodeBlock';
 import LocalFileLink from './LocalFileLink';
 import ShadowView from './ShadowView';
 import SvgBlock from './diagrams/SvgBlock';
-import { MARKDOWN_REMARK_PLUGINS, MarkdownTable, MarkdownTd } from './markdownComponents';
+import { DEFAULT_REHYPE_PLUGINS, MARKDOWN_REMARK_PLUGINS, MarkdownTable, MarkdownTd } from './markdownComponents';
 import { resolveLocalFileLinkPath, resolveLocalFileLinkReference } from './markdownUtils';
 import type { LocalFileLinkReference } from './markdownUtils';
 
@@ -160,7 +160,7 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
       []
     );
 
-    const rehypePlugins = useMemo(() => (allowHtml ? [rehypeRaw, rehypeKatex] : [rehypeKatex]), [allowHtml]);
+    const rehypePlugins = useMemo(() => (allowHtml ? [rehypeRaw, rehypeKatex] : DEFAULT_REHYPE_PLUGINS), [allowHtml]);
 
     return (
       <div className={classNames('relative w-full', className)}>
