@@ -55,6 +55,12 @@ export const SANITIZED_HTML_REHYPE_PLUGINS: ReactMarkdownOptions['rehypePlugins'
       protocols: {
         ...defaultSchema.protocols,
         src: [...(defaultSchema.protocols?.src || []), 'data', 'file'],
+        href: [
+          ...(defaultSchema.protocols?.href || []),
+          'file',
+          // Allow Windows drive letter paths (e.g. C:/path) parsed as protocols
+          ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+        ],
       },
     },
   ],
