@@ -391,8 +391,9 @@ export const useAcpMessage = (
             setAiProcessing(false);
             aiProcessingRef.current = false;
           }
-          // Auto-recover running state only if turn hasn't finished
-          if (!runningRef.current && !turnFinishedRef.current) {
+          // Auto-recover running state when actual content arrives
+          if (!runningRef.current) {
+            turnFinishedRef.current = false;
             setRunning(true);
             runningRef.current = true;
           }

@@ -137,4 +137,53 @@ describe('tips and agent_status message index isolation', () => {
     expect(tips).toHaveLength(1);
     expect(texts).toHaveLength(1);
   });
+
+  it('clears obsolete transient retryable tip when text arrives after successful retry', () => {
+    const retryableTip: TMessage = {
+      id: `tip-${MSG_ID}`,
+      msg_id: MSG_ID,
+      conversation_id: 'conv-1',
+      type: 'tips',
+      position: 'center',
+      created_at: 3,
+      content: {
+        content: '503 Unavailable',
+        type: 'error',
+        error: { code: 'USER_LLM_PROVIDER_GATEWAY_ERROR', message: '503 Unavailable', retryable: true },
+      },
+    } as TMessage;
+
+    const list = replay([retryableTip, textMessage('Recovered response after retry')]);
+
+    const tips = list.filter((m) => m.type === 'tips');
+    const texts = list.filter((m) => m.type === 'text');
+
+    expect(tips).toHaveLength(0);
+    expect(texts).toHaveLength(1);
+    expect((texts[0].content as { content: string }).content).toBe('Recovered response after retry');
+  });
+
+  it('retains non-retryable error tip when text arrives after it', () => {
+    const nonRetryableTip: TMessage = {
+      id: `tip-${MSG_ID}`,
+      msg_id: MSG_ID,
+      conversation_id: 'conv-1',
+      type: 'tips',
+      position: 'center',
+      created_at: 3,
+      content: {
+        content: 'Permission denied',
+        type: 'error',
+        error: { code: 'AIONUI_PERMISSION_ERROR', message: 'Permission denied', retryable: false },
+      },
+    } as TMessage;
+
+    const list = replay([nonRetryableTip, textMessage('Explanation text')]);
+
+    const tips = list.filter((m) => m.type === 'tips');
+    const texts = list.filter((m) => m.type === 'text');
+
+    expect(tips).toHaveLength(1);
+    expect(texts).toHaveLength(1);
+  });
 });

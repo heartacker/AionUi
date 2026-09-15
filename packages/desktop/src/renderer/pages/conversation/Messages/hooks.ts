@@ -302,6 +302,27 @@ export function composeMessageWithIndex(
   // text message: merge only with the latest contiguous streaming chunk.
   // text 消息: 只与最后一条连续的流式片段合并，保留被工具/思考打断后的消息边界。
   if (message.type === 'text' && message.msg_id) {
+    // If an assistant text response arrives for a turn that had a transient retryable error tip,
+    // the retry succeeded! Remove the obsolete transient error card so the live view matches the DB on reload.
+    const tipKey = `tips:${message.msg_id}`;
+    const existingTipIdx = index.msgIdIndex.get(tipKey);
+    if (existingTipIdx !== undefined && existingTipIdx < list.length) {
+      const existingTip = list[existingTipIdx];
+      if (
+        existingTip.type === 'tips' &&
+        existingTip.content?.type === 'error' &&
+        existingTip.content?.error?.retryable === true
+      ) {
+        list = list.filter((_, idx) => idx !== existingTipIdx);
+        const rebuilt = buildMessageIndex(list);
+        index.msgIdIndex = rebuilt.msgIdIndex;
+        index.call_idIndex = rebuilt.call_idIndex;
+        index.tool_call_idIndex = rebuilt.tool_call_idIndex;
+        index.permission_call_idIndex = rebuilt.permission_call_idIndex;
+        index.terminal_idIndex = rebuilt.terminal_idIndex;
+      }
+    }
+
     const existingIdx = index.msgIdIndex.get(message.msg_id);
     if (existingIdx !== undefined && existingIdx < list.length) {
       const existingMsg = list[existingIdx];
@@ -317,11 +338,12 @@ export function composeMessageWithIndex(
       }
     }
 
-    if (last.type === 'text' && last.msg_id === message.msg_id) {
+    const currentLast = list[list.length - 1];
+    if (currentLast && currentLast.type === 'text' && currentLast.msg_id === message.msg_id) {
       const newList = list.slice();
       newList[newList.length - 1] = {
-        ...last,
-        content: mergeTextMessageContent(last.content, message.content),
+        ...currentLast,
+        content: mergeTextMessageContent(currentLast.content, message.content),
       };
       return newList;
     }
