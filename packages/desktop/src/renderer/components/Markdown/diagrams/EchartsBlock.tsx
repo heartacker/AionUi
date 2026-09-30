@@ -115,6 +115,94 @@ export const buildChartSnapshotSvg = (dataUrl: string, width: number, height: nu
   `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
   `<image href="${dataUrl}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" /></svg>`;
 
+/**
+ * Normalizes user-provided ECharts option to avoid common visual glitches:
+ * 1. Missing `containLabel: true` in Cartesian charts causing rotated/long X/Y axis labels to clip.
+ * 2. Overlapping `legend` and `title` when neither sets custom positions.
+ * 3. Safe fallback grids and generous margins for readability.
+ */
+export const normalizeEChartsOption = (rawOption: Record<string, unknown>): Record<string, unknown> => {
+  const option = { ...rawOption };
+
+  const hasCartesian = Boolean(option.xAxis || option.yAxis);
+  const hasTitle = Boolean(option.title);
+  const hasLegend = Boolean(option.legend);
+
+  // 1. Avoid title and legend collision at the top and increase breathing room
+  if (hasTitle && hasLegend) {
+    if (Array.isArray(option.legend)) {
+      option.legend = option.legend.map((item) => {
+        if (item && typeof item === 'object' && !('top' in item) && !('bottom' in item) && !('y' in item)) {
+          return { ...item, top: 46 };
+        }
+        return item;
+      });
+    } else if (typeof option.legend === 'object' && option.legend !== null) {
+      const leg = option.legend as Record<string, unknown>;
+      if (!('top' in leg) && !('bottom' in leg) && !('y' in leg)) {
+        option.legend = { ...leg, top: 46 };
+      }
+    }
+  }
+
+  // 2. Ensure Cartesian charts contain axis labels and allocate safe margins with generous top spacing
+  if (hasCartesian) {
+    const defaultTop = hasTitle && hasLegend ? 88 : hasTitle ? 68 : hasLegend ? 52 : 32;
+
+    if (!option.grid) {
+      option.grid = {
+        containLabel: true,
+        left: '3%',
+        right: '4%',
+        bottom: '5%',
+        top: defaultTop,
+      };
+    } else if (Array.isArray(option.grid)) {
+      option.grid = option.grid.map((g) => {
+        if (g && typeof g === 'object') {
+          const gridObj = g as Record<string, unknown>;
+          return {
+            containLabel: true,
+            top: !('top' in gridObj) ? defaultTop : gridObj.top,
+            ...gridObj,
+          };
+        }
+        return g;
+      });
+    } else if (typeof option.grid === 'object' && option.grid !== null) {
+      const g = option.grid as Record<string, unknown>;
+      option.grid = {
+        containLabel: true,
+        ...(!('top' in g) && { top: defaultTop }),
+        ...g,
+      };
+    }
+  }
+
+  // 3. For non-Cartesian charts (pie, funnel, etc.), center downwards if title is present
+  if (hasTitle && !hasCartesian && Array.isArray(option.series)) {
+    option.series = option.series.map((s) => {
+      if (s && typeof s === 'object') {
+        const seriesObj = s as Record<string, unknown>;
+        const type = seriesObj.type as string | undefined;
+        if (
+          (type === 'pie' || type === 'funnel' || type === 'sunburst') &&
+          !('center' in seriesObj) &&
+          !('top' in seriesObj)
+        ) {
+          return {
+            ...seriesObj,
+            center: ['50%', '56%'],
+          };
+        }
+      }
+      return s;
+    });
+  }
+
+  return option;
+};
+
 type EchartsBlockProps = {
   code: string;
   isDark?: boolean;
@@ -123,7 +211,7 @@ type EchartsBlockProps = {
   diagramPanZoom?: boolean;
 };
 
-const DEFAULT_CHART_HEIGHT = 360;
+const DEFAULT_CHART_HEIGHT = 420;
 
 function EchartsBlock({
   code,
@@ -289,9 +377,10 @@ function EchartsBlock({
         renderer: 'canvas',
       });
 
+      const normalizedOption = normalizeEChartsOption(parsedOption);
       const optionToSet = {
         backgroundColor: 'transparent',
-        ...parsedOption,
+        ...normalizedOption,
       };
 
       // Snapshot after every settled render so the gallery item stays current

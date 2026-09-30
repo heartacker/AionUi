@@ -708,7 +708,7 @@ export const prepareDiagramSvgForExport = async (
   if (item.type === 'chart') {
     try {
       const echarts = await import('echarts');
-      const { parseEChartsOption, buildChartSnapshotSvg } = await import('./EchartsBlock');
+      const { parseEChartsOption, normalizeEChartsOption, buildChartSnapshotSvg } = await import('./EchartsBlock');
       const option = parseEChartsOption(item.code);
       if (option && typeof document !== 'undefined') {
         const div = document.createElement('div');
@@ -720,8 +720,9 @@ export const prepareDiagramSvgForExport = async (
         document.body.appendChild(div);
         try {
           const chart = echarts.init(div, targetTheme === 'dark' ? 'dark' : undefined, { renderer: 'canvas' });
+          const normalizedOption = normalizeEChartsOption(option);
           // animation: false ensures all series data, lines, bars, and legends render synchronously at frame 0
-          chart.setOption({ backgroundColor: 'transparent', animation: false, ...option });
+          chart.setOption({ backgroundColor: 'transparent', animation: false, ...normalizedOption });
           const chartBg = format === 'png-transparent' ? 'transparent' : targetTheme === 'dark' ? '#1d2129' : '#ffffff';
           const dataUrl = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: chartBg });
           chart.dispose();

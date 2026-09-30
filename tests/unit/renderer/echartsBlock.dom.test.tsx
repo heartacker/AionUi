@@ -3,6 +3,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import EchartsBlock, {
   buildChartSnapshotSvg,
+  normalizeEChartsOption,
   parseEChartsOption,
 } from '@/renderer/components/Markdown/diagrams/EchartsBlock';
 
@@ -124,6 +125,79 @@ describe('parseEChartsOption', () => {
     const code = '{"name": "test", "version": "1.0.0"}';
     const parsed = parseEChartsOption(code);
     expect(parsed).toBeNull();
+  });
+});
+
+describe('normalizeEChartsOption', () => {
+  it('adds default grid with containLabel: true for Cartesian charts without grid', () => {
+    const raw = {
+      xAxis: { type: 'category', data: ['A', 'B'] },
+      yAxis: { type: 'value' },
+      series: [{ type: 'bar', data: [1, 2] }],
+    };
+    const normalized = normalizeEChartsOption(raw);
+    expect(normalized.grid).toEqual({
+      containLabel: true,
+      left: '3%',
+      right: '4%',
+      bottom: '5%',
+      top: 32,
+    });
+  });
+
+  it('preserves existing grid properties and ensures containLabel: true', () => {
+    const raw = {
+      xAxis: { type: 'category', data: ['A', 'B'] },
+      series: [{ type: 'line', data: [1, 2] }],
+      grid: { left: '10%', top: 20 },
+    };
+    const normalized = normalizeEChartsOption(raw);
+    expect(normalized.grid).toEqual({
+      containLabel: true,
+      left: '10%',
+      top: 20,
+    });
+  });
+
+  it('adjusts legend.top to avoid overlapping with title and provide spacing when top is unspecified', () => {
+    const raw = {
+      title: { text: 'Sales Overview' },
+      legend: { data: ['Direct', 'Online'] },
+      series: [{ type: 'pie', data: [] }],
+    };
+    const normalized = normalizeEChartsOption(raw);
+    expect(normalized.legend).toEqual({
+      data: ['Direct', 'Online'],
+      top: 46,
+    });
+  });
+
+  it('adjusts pie series center to reserve space for title when unspecified', () => {
+    const raw = {
+      title: { text: 'Pie Chart' },
+      series: [{ type: 'pie', data: [{ name: 'A', value: 10 }] }],
+    };
+    const normalized = normalizeEChartsOption(raw);
+    expect(normalized.series).toEqual([
+      {
+        type: 'pie',
+        data: [{ name: 'A', value: 10 }],
+        center: ['50%', '56%'],
+      },
+    ]);
+  });
+
+  it('does not overwrite user specified legend top position', () => {
+    const raw = {
+      title: { text: 'Sales Overview' },
+      legend: { data: ['Direct', 'Online'], top: 100 },
+      series: [{ type: 'pie', data: [] }],
+    };
+    const normalized = normalizeEChartsOption(raw);
+    expect(normalized.legend).toEqual({
+      data: ['Direct', 'Online'],
+      top: 100,
+    });
   });
 });
 
