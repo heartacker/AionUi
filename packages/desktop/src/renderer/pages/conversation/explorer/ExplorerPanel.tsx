@@ -68,6 +68,8 @@ export type ExplorerPanelProps = {
    * resolves the pe-ref to an absolute path backend-side; the item is only shown
    * on Electron desktop (WebUI has no local shell / may be remote). Omit to hide. */
   onRevealInFolder?: (peId: string, relativePath: string) => void;
+  /** Download a file node to user's local disk. Works in both Electron and WebUI. Omit to hide. */
+  onDownload?: (peId: string, relativePath: string, name: string) => void;
   /** Copy the node's path relative to its owning pe root to the clipboard. Pure
    * clipboard (no OS shell / no absolute path), so it works for files and folders
    * on both Electron and WebUI. Omit to hide the item. */
@@ -100,6 +102,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
   onNewDir,
   onAddToChat,
   onRevealInFolder,
+  onDownload,
   onCopyRelativePath,
   onCopyAbsolutePath,
   onImportFiles,
@@ -322,6 +325,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
         revealInFolder: canReveal,
         copyRelativePath: Boolean(onCopyRelativePath),
         copyAbsolutePath: canCopyAbsolutePath,
+        download: isFile && Boolean(onDownload),
         newFile: !isFile && Boolean(onNewFile),
         newDir: !isFile && Boolean(onNewDir),
         rename: !isRoot && Boolean(onRename),
@@ -351,6 +355,7 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
         else if (menuKey === 'delete') onDelete?.(peId, rel, name);
         else if (menuKey === 'remove' && removable) onRemoveRoot?.(peId);
         else if (menuKey === 'revealInFolder') onRevealInFolder?.(peId, rel);
+        else if (menuKey === 'download') onDownload?.(peId, rel, name);
         else if (menuKey === 'copyRelativePath') onCopyRelativePath?.(peId, rel, name);
         else if (menuKey === 'copyAbsolutePath') onCopyAbsolutePath?.(peId, rel);
       };
@@ -361,6 +366,8 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
             return <Menu.Item key='addToChat'>{t('conversation.explorer.contextMenu.addToChat')}</Menu.Item>;
           case 'revealInFolder':
             return <Menu.Item key='revealInFolder'>{t('conversation.workspace.contextMenu.openLocation')}</Menu.Item>;
+          case 'download':
+            return <Menu.Item key='download'>{t('conversation.workspace.contextMenu.download')}</Menu.Item>;
           case 'copyRelativePath':
             return (
               <Menu.Item key='copyRelativePath'>{t('conversation.explorer.contextMenu.copyRelativePath')}</Menu.Item>
@@ -441,6 +448,10 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
       onNewFile,
       onNewDir,
       onAddToChat,
+      onRevealInFolder,
+      onDownload,
+      onCopyRelativePath,
+      onCopyAbsolutePath,
       onImportFiles,
       onTransfer,
       dragOverKey,

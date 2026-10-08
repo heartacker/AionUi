@@ -40,6 +40,7 @@ import { projectFileRef } from '@/common/types/chatFile';
 import type { ChatFileRef } from '@/common/types/chatFile';
 import type { FileOrFolderItem } from '@/renderer/utils/file/fileTypes';
 import { resolvePreviewPayload } from '@/renderer/utils/file/previewPayload';
+import { downloadFileFromRef } from '@/renderer/utils/file/download';
 
 import { ExplorerPanel } from './ExplorerPanel';
 import {
@@ -362,6 +363,17 @@ export const ExplorerContainer: React.FC<ExplorerContainerProps> = ({ projectId 
     });
   };
 
+  // Download a file node. Uses downloadFileFromRef which streams the file from the
+  // backend /api/fs/stream endpoint (same origin / proxy compatible in WebUI and Electron).
+  const handleDownload = async (peId: string, rel: string, name: string): Promise<void> => {
+    try {
+      await downloadFileFromRef(projectFileRef(peId, rel), name);
+      Message.success(t('conversation.workspace.contextMenu.downloadSuccess'));
+    } catch {
+      Message.error(t('conversation.workspace.contextMenu.downloadFailed'));
+    }
+  };
+
   // Copy the node's path relative to its owning pe root — the tree's native
   // identity (`relative_path`, always `/`-separated, cross-platform). A pe-root
   // node's relative_path is '' (it IS the root); copy '.' (its own literal
@@ -635,6 +647,7 @@ export const ExplorerContainer: React.FC<ExplorerContainerProps> = ({ projectId 
             onNewDir={handleNewDir}
             onAddToChat={activeConversationId ? handleAddToChat : undefined}
             onRevealInFolder={handleRevealInFolder}
+            onDownload={handleDownload}
             onCopyRelativePath={handleCopyRelativePath}
             onCopyAbsolutePath={handleCopyAbsolutePath}
             onImportFiles={handleImportFiles}

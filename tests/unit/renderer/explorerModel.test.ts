@@ -645,6 +645,7 @@ describe('explorerContextMenuSections — grouped, ordered, divider-ready sectio
     revealInFolder: false,
     copyRelativePath: false,
     copyAbsolutePath: false,
+    download: false,
     newFile: false,
     newDir: false,
     rename: false,
@@ -674,7 +675,7 @@ describe('explorerContextMenuSections — grouped, ordered, divider-ready sectio
     ]);
   });
 
-  it('a file leaf drops new-file / new-dir but keeps rename + delete', () => {
+  it('a file leaf drops new-file / new-dir but keeps download + rename + delete', () => {
     expect(
       explorerContextMenuSections(
         caps({
@@ -682,11 +683,16 @@ describe('explorerContextMenuSections — grouped, ordered, divider-ready sectio
           revealInFolder: true,
           copyRelativePath: true,
           copyAbsolutePath: true,
+          download: true,
           rename: true,
           delete: true,
         })
       )
-    ).toEqual([['addToChat'], ['revealInFolder', 'copyRelativePath', 'copyAbsolutePath'], ['rename', 'delete']]);
+    ).toEqual([
+      ['addToChat'],
+      ['revealInFolder', 'copyRelativePath', 'copyAbsolutePath', 'download'],
+      ['rename', 'delete'],
+    ]);
   });
 
   it('a pe root shows create + remove-from-project instead of rename / delete', () => {
@@ -734,6 +740,14 @@ describe('explorerContextMenuSections — grouped, ordered, divider-ready sectio
         caps({ addToChat: true, copyRelativePath: true, newFile: true, newDir: true, rename: true, delete: true })
       )
     ).toEqual([['addToChat'], ['copyRelativePath'], ['newFile', 'newDir', 'rename', 'delete']]);
+  });
+
+  it('WebUI on a file includes download alongside copy-relative', () => {
+    expect(
+      explorerContextMenuSections(
+        caps({ addToChat: true, copyRelativePath: true, download: true, rename: true, delete: true })
+      )
+    ).toEqual([['addToChat'], ['copyRelativePath', 'download'], ['rename', 'delete']]);
   });
 
   it('returns no sections when nothing is enabled (the node shows no menu at all)', () => {
